@@ -89,8 +89,8 @@ namespace ChillAIMod
             _modelConfig = Config.Bind("1. General", "ModelName", "openai/gpt-3.5-turbo", "LLM Model Name");
 
             _sovitsUrlConfig = Config.Bind("2. Audio", "SoVITS_URL", "http://127.0.0.1:9880", "GPT-SoVITS API URL");
-            _refAudioPathConfig = Config.Bind("2. Audio", "RefAudioPath", @"D:\Voice_SmallTalk_4_004.wav", "Ref Audio Path");
-            _promptTextConfig = Config.Bind("2. Audio", "PromptText", "13年周期と17年周期が重なる、221年に一度のダブルウーカの年は、", "Ref Audio Text");
+            _refAudioPathConfig = Config.Bind("2. Audio", "RefAudioPath", @"D:\Voice_MainScenario_27_016.wav", "Ref Audio Path");
+            _promptTextConfig = Config.Bind("2. Audio", "PromptText", "君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。", "Ref Audio Text");
             _promptLangConfig = Config.Bind("2. Audio", "PromptLang", "ja", "Ref Lang");
             _targetLangConfig = Config.Bind("2. Audio", "TargetLang", "ja", "Target Lang");
 
