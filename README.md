@@ -38,6 +38,7 @@
 - 2. Audio
   - SoVITS_URL — 本地 TTS 服务地址（如 `http://127.0.0.1:9880`）
   - RefAudioPath — 参考音频路径（.wav）
+  - TTS_Service_Path — 本地 TTS 服务路径。在游戏开启时自动启动。
   - PromptText — 参考音频对应的文本（用于声线迁移）
   - PromptLang / TargetLang — 参考文本与目标语言标识
   - VoiceVolume — 语音播放音量（0.0 - 1.0）

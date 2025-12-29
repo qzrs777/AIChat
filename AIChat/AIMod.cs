@@ -26,8 +26,10 @@ namespace ChillAIMod
         private ConfigEntry<string> _targetLangConfig;
         private ConfigEntry<string> _personaConfig;
         private ConfigEntry<string> _chatApiUrlConfig;
+
         private ConfigEntry<string> _TTSServicePathConfig;
         private ConfigEntry<bool> _LaunchTTSServiceConfig;
+        private ConfigEntry<bool> _quitTTSServiceOnQuitConfig;
 
         // --- 新增窗口大小配置 ---
         private ConfigEntry<float> _windowWidthConfig;
@@ -46,6 +48,11 @@ namespace ChillAIMod
         private string _playerInput = "";
         private bool _isProcessing = false;
         private bool _isResizing = false; // 新增：拖拽调整大小状态
+
+        private Process _launchedTTSProcess;
+        private bool _isTTSServiceReady = false;
+        private Coroutine _ttsHealthCheckCoroutine;
+        private const float TTSHealthCheckInterval = 5f; // 每5秒检查一次
 
         private AudioSource _audioSource;
         private MonoBehaviour _heroineService;
@@ -110,6 +117,7 @@ namespace ChillAIMod
             _refAudioPathConfig = Config.Bind("2. Audio", "RefAudioPath", @"D:\Voice_MainScenario_27_016.wav", "Ref Audio Path");
             _TTSServicePathConfig = Config.Bind("2. Audio", "TTS_Service_Path", @"D:\GPT-SoVITS\GPT-SoVITS-v2pro-20250604-nvidia50\run_api.bat", "TTS Service Path");
             _LaunchTTSServiceConfig = Config.Bind("2. Audio", "LaunchTTSService", true, "是否在游戏启动时自动启动 TTS 服务");
+            _quitTTSServiceOnQuitConfig = Config.Bind("2. Audio", "QuitTTSServiceOnQuit", true, "是否在游戏退出时自动关闭 TTS 服务");
             _promptTextConfig = Config.Bind("2. Audio", "PromptText", "君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。", "Ref Audio Text");
             _promptLangConfig = Config.Bind("2. Audio", "PromptLang", "ja", "Ref Lang");
             _targetLangConfig = Config.Bind("2. Audio", "TargetLang", "ja", "Target Lang");
@@ -149,13 +157,18 @@ namespace ChillAIMod
                         UseShellExecute = true,
                         WorkingDirectory = Path.GetDirectoryName(cleanPath)
                     };
-                    Process.Start(startInfo);
+                    _launchedTTSProcess = Process.Start(startInfo);
                     Logger.LogInfo("已启动 TTS 服务");
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError($"启动 TTS 服务失败: {ex.Message}");
                 }
+            }
+            // 启动后台 TTS 健康检测
+            if (_ttsHealthCheckCoroutine == null)
+            {
+                _ttsHealthCheckCoroutine = StartCoroutine(TTSHealthCheckLoop());
             }
 
             Logger.LogInfo(">>> AIMod V1.1.0  已加载 <<<");
@@ -277,6 +290,9 @@ namespace ChillAIMod
             string status = _heroineService != null ? "🟢 核心已连接" : "🔴 正在寻找核心...";
             GUILayout.Label(status);
 
+            string ttsStatus = _isTTSServiceReady ? "🟢 TTS 服务已就绪" : "🔴 正在等待 TTS 服务启动...";
+            GUILayout.Label(ttsStatus);
+
             if (GUILayout.Button(_showSettings ? "🔽 收起设置" : "▶️ 展开设置 (API / 人设 / 路径)", GUILayout.Height(25)))
             {
                 _showSettings = !_showSettings;
@@ -306,6 +322,7 @@ namespace ChillAIMod
                 _TTSServicePathConfig.Value = GUILayout.TextField(_TTSServicePathConfig.Value);
                 GUILayout.Space(5);
                 _LaunchTTSServiceConfig.Value = GUILayout.Toggle(_LaunchTTSServiceConfig.Value, "启动时自动运行 TTS 服务");
+                _quitTTSServiceOnQuitConfig.Value = GUILayout.Toggle(_quitTTSServiceOnQuitConfig.Value, "退出时自动关闭 TTS 服务");
 
                 // 【新增音量控制 UI】
                 GUILayout.Space(5);
@@ -619,7 +636,7 @@ namespace ChillAIMod
                     myText.text = "Generating Voice...";
                     AudioClip downloadedClip = null;
                     // 【修改点 1: 移除 apiKey 参数，因为 TTS 是本地部署】
-                    yield return StartCoroutine(DownloadVoice(voiceText, (clip) => downloadedClip = clip));
+                    yield return StartCoroutine(DownloadVoiceWithRetry(voiceText, (clip) => downloadedClip = clip));
 
                     if (downloadedClip != null)
                     {
@@ -661,8 +678,63 @@ namespace ChillAIMod
             _isProcessing = false;
         }
 
+        IEnumerator TTSHealthCheckLoop()
+        {
+            while (!_isTTSServiceReady)
+            {
+                yield return StartCoroutine(CheckTTSHealthOnce((ready) =>
+                {
+                    _isTTSServiceReady = ready;
+                }));
+                yield return new WaitForSeconds(TTSHealthCheckInterval);
+            }
+        }
+
+        IEnumerator CheckTTSHealthOnce(Action<bool> onResult)
+        {
+            string ttsUrl = _sovitsUrlConfig.Value.TrimEnd('/') + "/tts";
+            string minimalJson = @"{""text"": ""test""}";
+            using (UnityWebRequest req = new UnityWebRequest(ttsUrl, "POST")) // 没有/ping能够检测服务是否启动，只能利用/tts发一个小包观测失败返回码
+            {
+                byte[] bodyRaw = Encoding.UTF8.GetBytes(minimalJson);
+                req.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.SetRequestHeader("Content-Type", "application/json");
+                req.timeout = 8;
+
+                yield return req.SendWebRequest();
+
+                bool isReady = false;
+                if (req.result == UnityWebRequest.Result.Success)
+                {
+                    isReady = true;
+                }
+                else if (req.responseCode == 422 || req.responseCode == 400) // 在我的电脑上返回400 bad request.
+                {
+                    isReady = true;
+                }
+                else
+                {
+                    // 404, 500, ConnectionError, Timeout 等 → 服务未就绪
+                    isReady = false;
+                }
+
+                if (isReady)
+                {
+                    Logger.LogDebug("[TTS Health] 检测到服务已启动 (返回 422/200 等)");
+                }
+                else
+                {
+                    string error = req.error ?? $"HTTP {req.responseCode}";
+                    Logger.LogDebug($"[TTS Health] 服务未就绪: {error}");
+                }
+
+                onResult?.Invoke(isReady);
+            }
+        }
+
         // 【修改点 2: DownloadVoice 协程函数移除 apiKey 参数，并修复 DownloadHandler】
-        IEnumerator DownloadVoice(string textToSpeak, Action<AudioClip> onComplete)
+        IEnumerator DownloadVoiceWithRetry(string textToSpeak, Action<AudioClip> onComplete, int maxRetries = 3, float timeoutSeconds = 30f)
         {
             string url = _sovitsUrlConfig.Value + "/tts";
             string refPath = _refAudioPathConfig.Value;
@@ -679,29 +751,47 @@ namespace ChillAIMod
                 }
             }
 
-            string jsonBody = $@"{{ ""text"": ""{EscapeJson(textToSpeak)}"", ""text_lang"": ""{_targetLangConfig.Value}"", ""ref_audio_path"": ""{EscapeJson(refPath)}"", ""prompt_text"": ""{EscapeJson(_promptTextConfig.Value)}"", ""prompt_lang"": ""{_promptLangConfig.Value}"" }}";
+            string jsonBody = $@"{{ 
+                ""text"": ""{EscapeJson(textToSpeak)}"", 
+                ""text_lang"": ""{_targetLangConfig.Value}"", 
+                ""ref_audio_path"": ""{EscapeJson(refPath)}"", 
+                ""prompt_text"": ""{EscapeJson(_promptTextConfig.Value)}"", 
+                ""prompt_lang"": ""{_promptLangConfig.Value}"" 
+            }}";
 
-            using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
-                byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                request.downloadHandler = new DownloadHandlerAudioClip(url, AudioType.WAV);
-                request.SetRequestHeader("Content-Type", "application/json");
-                yield return request.SendWebRequest();
+                using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+                {
+                    byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
+                    request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                    request.downloadHandler = new DownloadHandlerAudioClip(url, AudioType.WAV);
+                    request.SetRequestHeader("Content-Type", "application/json");
+                    request.timeout = (int)timeoutSeconds;
 
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    // 只有在 DownloadHandlerAudioClip 成功设置后，这个调用才有效
-                    onComplete?.Invoke(DownloadHandlerAudioClip.GetContent(request));
-                }
-                else
-                {
-                    // 【改进：打印响应文本以辅助调试】
-                    string responseText = request.downloadHandler?.text ?? "N/A";
-                    Logger.LogError($"TTS Error: {request.error}. Response Text: {responseText}");
-                    onComplete?.Invoke(null);
+                    yield return request.SendWebRequest();
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        var clip = DownloadHandlerAudioClip.GetContent(request);
+                        if (clip != null)
+                        {
+                            Logger.LogInfo($"[TTS] 语音生成成功（第 {attempt} 次尝试）");
+                            onComplete?.Invoke(clip);
+                            yield break; // 成功则退出
+                        }
+                    }
+
+                    Logger.LogWarning($"[TTS] 第 {attempt}/{maxRetries} 次尝试失败: {request.error}");
+                    if (attempt < maxRetries)
+                    {
+                        yield return new WaitForSeconds(2f); // 重试前等待
+                    }
                 }
             }
+
+            Logger.LogError("[TTS] 所有重试均失败，放弃生成语音");
+            onComplete?.Invoke(null);
         }
 
         IEnumerator PlayNativeAnimation(string emotion, AudioClip voiceClip)
@@ -857,6 +947,61 @@ namespace ChillAIMod
             }
             foreach (var c in target.GetComponentsInParent<CanvasGroup>()) c.alpha = 1f;
             target.transform.parent.parent.localScale = Vector3.one;
+        }
+
+        void OnApplicationQuit()
+        {
+            Logger.LogInfo("[Chill AI Mod] 退出中...");
+            Logger.LogInfo("[Chill AI Mod] 正在停止TTS轮询...");
+            if (_ttsHealthCheckCoroutine != null)
+            {
+                StopCoroutine(_ttsHealthCheckCoroutine);
+                _ttsHealthCheckCoroutine = null;
+            }
+            if (_quitTTSServiceOnQuitConfig.Value && _launchedTTSProcess != null && !_launchedTTSProcess.HasExited)
+            {   
+                try
+                {
+                    KillProcessTree(_launchedTTSProcess);
+                    Logger.LogInfo("TTS 服务已关闭");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"关闭 TTS 服务时出错: {ex.Message}");
+                }
+            }
+        }
+
+        private void KillProcessTree(Process process)
+        {
+            if (process == null || process.HasExited) return;
+
+            try
+            {
+                int pid = process.Id;
+                Logger.LogInfo($"[TTS Cleanup] 使用 taskkill 终止进程树 (PID: {pid})");
+
+                // 在新进程中执行 taskkill /T /F /PID <pid>
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "taskkill",
+                    Arguments = $"/T /F /PID {pid}", // /T = 终止子进程, /F = 强制
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                using (Process killer = Process.Start(psi))
+                {
+                    killer.WaitForExit(3000); // 等待最多 3 秒
+                }
+
+                Logger.LogInfo($"[TTS Cleanup] taskkill 执行完毕 (PID: {pid})");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"[TTS Cleanup] taskkill 失败: {ex.Message}");
+            }
         }
     }
 }
