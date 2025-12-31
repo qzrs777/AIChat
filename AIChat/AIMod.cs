@@ -17,6 +17,7 @@ namespace ChillAIMod
     public class AIMod : BaseUnityPlugin
     {
         // ================= 【配置项】 =================
+        private ConfigEntry<bool> _useLocalOllama;
         private ConfigEntry<string> _apiKeyConfig;
         private ConfigEntry<string> _modelConfig;
         private ConfigEntry<string> _sovitsUrlConfig;
@@ -110,6 +111,7 @@ namespace ChillAIMod
             _chatApiUrlConfig = Config.Bind("1. General", "ApiUrl",
                 "https://openrouter.ai/api/v1/chat/completions",
                 "LLM API 地址 (支持 OpenAI/中转站)");
+            _useLocalOllama = Config.Bind("1. General", "Use Loacal Ollama Model", false, "Use Loacal Ollama Model");
             _apiKeyConfig = Config.Bind("1. General", "APIKey", "sk-or-v1-PasteYourKeyHere", "OpenRouter API Key");
             _modelConfig = Config.Bind("1. General", "ModelName", "openai/gpt-3.5-turbo", "LLM Model Name");
 
@@ -303,10 +305,13 @@ namespace ChillAIMod
                 GUILayout.Space(10);
                 GUILayout.BeginVertical("box");
                 GUILayout.Label("<b>--- 基础配置 ---</b>");
+                _useLocalOllama.Value = GUILayout.Toggle(_useLocalOllama.Value, "使用本地Ollama模型");
                 GUILayout.Label("API URL:");
                 _chatApiUrlConfig.Value = GUILayout.TextField(_chatApiUrlConfig.Value);
-                GUILayout.Label("API Key:");
-                _apiKeyConfig.Value = GUILayout.TextField(_apiKeyConfig.Value);
+                if (!_useLocalOllama.Value) {
+                    GUILayout.Label("API Key:");
+                    _apiKeyConfig.Value = GUILayout.TextField(_apiKeyConfig.Value);
+                }
                 GUILayout.Label("Model Name:");
                 _modelConfig.Value = GUILayout.TextField(_modelConfig.Value);
                 GUILayout.EndVertical();
@@ -314,11 +319,13 @@ namespace ChillAIMod
                 GUILayout.Space(5);
                 GUILayout.BeginVertical("box");
                 GUILayout.Label("<b>--- 语音配置 ---</b>");
+                GUILayout.Label("TTS Service Url:");
+                _sovitsUrlConfig.Value = GUILayout.TextField(_sovitsUrlConfig.Value);
                 GUILayout.Label("音频路径 (.wav):");
                 _refAudioPathConfig.Value = GUILayout.TextField(_refAudioPathConfig.Value);
                 GUILayout.Label("音频台词:");
                 _promptTextConfig.Value = GUILayout.TextArea(_promptTextConfig.Value, GUILayout.Height(50));
-                GUILayout.Label("TTS 服务路径 (run_api.bat):");
+                GUILayout.Label("TTS 服务启动路径 (run_api.bat):");
                 _TTSServicePathConfig.Value = GUILayout.TextField(_TTSServicePathConfig.Value);
                 GUILayout.Space(5);
                 _LaunchTTSServiceConfig.Value = GUILayout.Toggle(_LaunchTTSServiceConfig.Value, "启动时自动运行 TTS 服务");
@@ -553,7 +560,8 @@ namespace ChillAIMod
             string apiKey = _apiKeyConfig.Value;
             string modelName = _modelConfig.Value;
             string persona = _personaConfig.Value;
-            string jsonBody = $@"{{ ""model"": ""{modelName}"", ""messages"": [ {{ ""role"": ""system"", ""content"": ""{EscapeJson(persona)}"" }}, {{ ""role"": ""user"", ""content"": ""{EscapeJson(prompt)}"" }} ] }}";
+            string extraJson = _useLocalOllama.Value ? $@",""stream"": false" : "";
+            string jsonBody = $@"{{ ""model"": ""{modelName}"", ""messages"": [ {{ ""role"": ""system"", ""content"": ""{EscapeJson(persona)}"" }}, {{ ""role"": ""user"", ""content"": ""{EscapeJson(prompt)}"" }} ]{extraJson} }}";
             string fullResponse = "";
 
             // 3. 发送 Chat 请求
@@ -563,12 +571,24 @@ namespace ChillAIMod
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
-                request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+                if (!_useLocalOllama.Value)
+                {
+                    request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+                }
                 yield return request.SendWebRequest();
 
                 if (request.result == UnityWebRequest.Result.Success)
                 {
-                    fullResponse = ExtractContentRegex(request.downloadHandler.text);
+                    Logger.LogInfo($"获取的完整回复：\n\t{request.downloadHandler.text}");
+                    if (_useLocalOllama.Value)
+                    {
+                        fullResponse = ExtractContentFromOllama(request.downloadHandler.text);
+                        Logger.LogInfo($"ExtractContentFromOllama: \n\t{fullResponse}");
+                    }
+                    else
+                    {
+                        fullResponse = ExtractContentRegex(request.downloadHandler.text);
+                    }
                 }
                 else
                 {
@@ -609,6 +629,8 @@ namespace ChillAIMod
                     emotionTag = parts[0].Trim().Replace("[", "").Replace("]", "");
                     voiceText = parts[1].Trim();
                     subtitleText = parts[2].Trim();
+
+                    Logger.LogInfo($"Parse Response With\n\temotionTag: {emotionTag}\n\tvoiceText: {voiceText}\n\tsubtitleText: {subtitleText}");
                 }
                 else
                 {
@@ -630,6 +652,7 @@ namespace ChillAIMod
                 // 简单的日语检测：看是否包含假名 (Hiragana/Katakana)
                 // 这是一个可选的保险措施
                 bool isJapanese = Regex.IsMatch(voiceText, @"[\u3040-\u309F\u30A0-\u30FF]");
+                Logger.LogInfo($"isJapanese: {isJapanese}");
 
                 if (!string.IsNullOrEmpty(voiceText) && isJapanese)
                 {
@@ -736,6 +759,8 @@ namespace ChillAIMod
         // 【修改点 2: DownloadVoice 协程函数移除 apiKey 参数，并修复 DownloadHandler】
         IEnumerator DownloadVoiceWithRetry(string textToSpeak, Action<AudioClip> onComplete, int maxRetries = 3, float timeoutSeconds = 30f)
         {
+            Logger.LogInfo("[TTS] 开始生成语音...");
+
             string url = _sovitsUrlConfig.Value + "/tts";
             string refPath = _refAudioPathConfig.Value;
 
@@ -769,20 +794,24 @@ namespace ChillAIMod
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.timeout = (int)timeoutSeconds;
 
+                    var requestStartTime = DateTime.UtcNow;
+
                     yield return request.SendWebRequest();
+
+                    var requestDuration = (DateTime.UtcNow - requestStartTime).TotalSeconds;
 
                     if (request.result == UnityWebRequest.Result.Success)
                     {
                         var clip = DownloadHandlerAudioClip.GetContent(request);
                         if (clip != null)
                         {
-                            Logger.LogInfo($"[TTS] 语音生成成功（第 {attempt} 次尝试）");
+                            Logger.LogInfo($"[TTS] 语音生成成功（第 {attempt} 次尝试）（耗时 {requestDuration:F2}s）");
                             onComplete?.Invoke(clip);
                             yield break; // 成功则退出
                         }
                     }
 
-                    Logger.LogWarning($"[TTS] 第 {attempt}/{maxRetries} 次尝试失败: {request.error}");
+                    Logger.LogWarning($"[TTS] 第 {attempt}/{maxRetries} 次尝试失败（耗时 {requestDuration:F2}s）: {request.error}");
                     if (attempt < maxRetries)
                     {
                         yield return new WaitForSeconds(2f); // 重试前等待
@@ -913,6 +942,24 @@ namespace ChillAIMod
         {
             try { var match = Regex.Match(json, "\"content\"\\s*:\\s*\"(.*?)\""); return match.Success ? Regex.Unescape(match.Groups[1].Value) : null; }
             catch { return null; }
+        }
+
+        private string ExtractContentFromOllama(string jsonResponse)
+        {
+            try
+            {
+                var match = Regex.Match(jsonResponse, "\"content\"\\s*:\\s*\"([^\"]*)\"");
+                if (match.Success)
+                {
+                    return Regex.Unescape(match.Groups[1].Value);
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"[Ollama] 解析失败: {ex.Message}");
+                return null;
+            }
         }
 
         string EscapeJson(string s)
