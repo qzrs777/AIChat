@@ -2,8 +2,8 @@
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-    <GamePath>F:\SteamLibrary\steamapps\common\Chill with You Lo-Fi Story</GamePath>
-    <UnityEditorPath>C:\Program Files\Unity\Hub\Editor\2022.3.53f1c1\Editor\Data\Managed</UnityEditorPath>
+    <GamePath>D:\steam\steamapps\common\Chill with You Lo-Fi Story</GamePath>
+    <UnityEditorPath>D:\UnityEditor\2022.3.62f1c1\Editor\Data\Managed</UnityEditorPath>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
