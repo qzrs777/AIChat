@@ -11,6 +11,9 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Diagnostics;
+using AIChat.Core;
+using AIChat.Services;
+using AIChat.Unity;
 
 namespace ChillAIMod
 {
@@ -68,13 +71,7 @@ namespace ChillAIMod
         private const float TTSHealthCheckInterval = 5f; // 每5秒检查一次
 
         private AudioSource _audioSource;
-        private MonoBehaviour _heroineService;
-        private Animator _cachedAnimator;
-
-        private MethodInfo _changeAnimSmoothMethod;
-        private MethodInfo _lookInitMethod;
-        private MethodInfo _lookAtMethod;
-
+       
         private bool _isAISpeaking = false;
 
         // 新增：用于 UI 输入的临时字符串，避免每次都转换
@@ -210,24 +207,24 @@ namespace ChillAIMod
         void Update()
         {
             // 自动连接游戏核心
-            if (_heroineService == null && Time.frameCount % 100 == 0) FindHeroineService();
+            if (GameBridge._heroineService == null && Time.frameCount % 100 == 0) GameBridge.FindHeroineService(Logger);
 
             // 口型同步逻辑
-            if (_isAISpeaking && _cachedAnimator != null && _audioSource != null)
+            if (_isAISpeaking && GameBridge._cachedAnimator != null && _audioSource != null)
             {
                 bool shouldTalk = _audioSource.isPlaying;
 
                 // 只有状态改变时才调用，优化性能
-                if (_cachedAnimator.GetBool("Enable_Talk") != shouldTalk)
+                if (GameBridge._cachedAnimator.GetBool("Enable_Talk") != shouldTalk)
                 {
-                    _cachedAnimator.SetBool("Enable_Talk", shouldTalk);
+                    GameBridge._cachedAnimator.SetBool("Enable_Talk", shouldTalk);
                 }
 
                 // 语音播完，立即归还控制权
                 if (!shouldTalk)
                 {
                     _isAISpeaking = false;
-                    _cachedAnimator.SetBool("Enable_Talk", false);
+                    GameBridge._cachedAnimator.SetBool("Enable_Talk", false);
                 }
             }
         }
@@ -240,14 +237,6 @@ namespace ChillAIMod
                 if (Time.unscaledTime - 0 > 0.2f) // 简单防抖
                 {
                     _showInputWindow = !_showInputWindow;
-                    // // 每次打开时，重新计算 X 轴居中
-                    // if (_showInputWindow)
-                    // {
-                    //     float margin = 20f;
-                    //     _windowRect.x = margin;
-                    //     _windowRect.y = margin;
-                    // }
-                    // e.Use();
                 }
             }
 
@@ -348,7 +337,7 @@ namespace ChillAIMod
             GUILayout.BeginVertical();
 
             // 状态显示
-            string status = _heroineService != null ? "🟢 核心已连接" : "🔴 正在寻找核心...";
+            string status = GameBridge._heroineService != null ? "🟢 核心已连接" : "🔴 正在寻找核心...";
             GUILayout.Label(status);
 
             string ttsStatus = _isTTSServiceReady ? "🟢 TTS 服务已就绪" : "🔴 正在等待 TTS 服务启动...";
@@ -487,8 +476,7 @@ namespace ChillAIMod
                     }
                 }
                 GUILayout.EndHorizontal();
-                GUILayout.EndVertical(); // <--- 必须结束！
-
+                GUILayout.EndVertical(); 
                 GUILayout.Space(5);
 
                 // --- 5. 人设配置 Box ---
@@ -552,8 +540,23 @@ namespace ChillAIMod
             }
 
             // ================== 录音按钮 ==================
-            GUI.backgroundColor = _isRecording ? Color.red : Color.green;
-            string micBtnText = _isRecording ? "🔴 松开结束" : "🎤 按住说话";
+            if (_isProcessing)
+            {
+                GUI.backgroundColor = Color.gray; 
+            }
+            else
+            {
+                GUI.backgroundColor = _isRecording ? Color.red : Color.green;
+            }
+            string micBtnText;
+            if (_isProcessing)
+            {
+                micBtnText = "⏳ 思考中...";
+            }
+            else
+            {
+                micBtnText = _isRecording ? "🔴 松开结束" : "🎤 按住说话";
+            }
 
             // 使用 GUILayout.Width(singleBtnWidth) 强制固定宽度
             Rect btnRect = GUILayoutUtility.GetRect(
@@ -616,91 +619,6 @@ namespace ChillAIMod
             }
         }
 
-        // =========================================================================================
-        // 【新增辅助函数】确保对话文本（字幕）强制换行，以防过长溢出屏幕。
-        // =========================================================================================
-        /// <summary>
-        /// 在长文本中插入换行符，以确保文本在 UI 中可见。
-        /// </summary>
-        /// <param name="text">原始文本</param>
-        /// <param name="maxLineLength">每行最大字符数</param>
-        /// <returns>带有换行符的文本</returns>
-        private string InsertLineBreaks(string text, int maxLineLength = 25)
-        {
-            if (string.IsNullOrEmpty(text) || text.Length <= maxLineLength)
-            {
-                return text;
-            }
-
-            StringBuilder sb = new StringBuilder();
-            int currentLength = 0;
-            for (int i = 0; i < text.Length; i++)
-            {
-                char c = text[i];
-                sb.Append(c);
-                currentLength++;
-
-                if (currentLength >= maxLineLength && c != '\n')
-                {
-                    // 检查下一个字符是否已经是换行符，避免双重换行
-                    if (i + 1 < text.Length && text[i + 1] != '\n')
-                    {
-                        sb.Append('\n');
-                        currentLength = 0;
-                    }
-                }
-
-                if (c == '\n')
-                {
-                    currentLength = 0;
-                }
-            }
-            return sb.ToString();
-        }
-
-        // ================= 【新增 ASR 请求逻辑】 =================
-        IEnumerator SendAudioToASR(byte[] wavData)
-        {
-            _isProcessing = true; // 锁定 UI，显示思考中
-            string url = _sovitsUrlConfig.Value.TrimEnd('/') + "/asr";
-
-            WWWForm form = new WWWForm();
-            form.AddBinaryData("file", wavData, "voice.wav", "audio/wav");
-
-            using (UnityWebRequest www = UnityWebRequest.Post(url, form))
-            {
-                yield return www.SendWebRequest();
-
-                if (www.result == UnityWebRequest.Result.Success)
-                {
-                    string json = www.downloadHandler.text;
-                    Logger.LogInfo($"[ASR] 服务器返回: {json}");
-
-                    // 简单的 JSON 解析: {"text": "你好"}
-                    string recognizedText = ExtractJsonValue(json, "text");
-
-                    if (!string.IsNullOrEmpty(recognizedText))
-                    {
-                        // 【核心功能】直接发送识别结果给 AI 处理
-                        StartCoroutine(AIProcessRoutine(recognizedText));
-                    }
-                }
-                else
-                {
-                    Logger.LogError($"[ASR] 请求失败: {www.error}");
-                }
-            }
-
-            _isProcessing = false; // 解锁 UI
-        }
-        
-        // 简易 JSON 提取辅助函数
-        private string ExtractJsonValue(string json, string key)
-        {
-            var match = Regex.Match(json, $"\"{key}\"\\s*:\\s*\"(.*?)\"");
-            return match.Success ? Regex.Unescape(match.Groups[1].Value) : "";
-        }
-
         IEnumerator AIProcessRoutine(string prompt)
         {
             _isProcessing = true;
@@ -712,9 +630,9 @@ namespace ChillAIMod
             if (originalTextTrans == null) { _isProcessing = false; yield break; }
             GameObject originalTextObj = originalTextTrans.gameObject;
             GameObject parentObj = originalTextObj.transform.parent.gameObject;
-            ForceShowWindow(originalTextObj);
+            UIHelper.ForceShowWindow(originalTextObj);
             originalTextObj.SetActive(false);
-            GameObject myTextObj = CreateOverlayText(parentObj);
+            GameObject myTextObj = UIHelper.CreateOverlayText(parentObj);
             Text myText = myTextObj.GetComponent<Text>();
             myText.text = "Thinking..."; myText.color = Color.yellow;
 
@@ -761,12 +679,12 @@ namespace ChillAIMod
                     Logger.LogInfo($"获取的完整回复：\n\t{request.downloadHandler.text}");
                     if (_useLocalOllama.Value)
                     {
-                        fullResponse = ExtractContentFromOllama(request.downloadHandler.text);
+                        fullResponse = ResponseParser.ExtractContentFromOllama(request.downloadHandler.text , Logger);
                         Logger.LogInfo($"ExtractContentFromOllama: \n\t{fullResponse}");
                     }
                     else
                     {
-                        fullResponse = ExtractContentRegex(request.downloadHandler.text);
+                        fullResponse = ResponseParser.ExtractContentRegex(request.downloadHandler.text);
                     }
                 }
                 else
@@ -786,7 +704,6 @@ namespace ChillAIMod
                     if (myTextObj != null) Destroy(myTextObj);
                     if (originalTextObj != null) originalTextObj.SetActive(true);
                     _isProcessing = false;
-
                     yield break;
                 }
             }
@@ -839,7 +756,7 @@ namespace ChillAIMod
                 }
 
                 // 【应用换行】 在将字幕文本显示到 UI 之前，强制插入换行符
-                subtitleText = InsertLineBreaks(subtitleText, 25);
+                subtitleText = ResponseParser.InsertLineBreaks(subtitleText, 25);
 
                 // 只有当 voiceText 不为空，且看起来像是日语时，才请求 TTS
                 // 简单的日语检测：看是否包含假名 (Hiragana/Katakana)
@@ -849,10 +766,18 @@ namespace ChillAIMod
 
                 if (!string.IsNullOrEmpty(voiceText) && isJapanese)
                 {
-                    myText.text = "Generating Voice...";
+                    myText.text = "message is sending through cyber space";
                     AudioClip downloadedClip = null;
                     // 【修改点 1: 移除 apiKey 参数，因为 TTS 是本地部署】
-                    yield return StartCoroutine(DownloadVoiceWithRetry(voiceText, (clip) => downloadedClip = clip));
+                    yield return StartCoroutine(TTSClient.DownloadVoiceWithRetry(
+                        _sovitsUrlConfig.Value + "/tts",
+                        voiceText,
+                        _targetLangConfig.Value,
+                        _refAudioPathConfig.Value,
+                        _promptTextConfig.Value,
+                        _promptLangConfig.Value,
+                        Logger,
+                        (clip) => downloadedClip = clip));
 
                     if (downloadedClip != null)
                     {
@@ -898,7 +823,7 @@ namespace ChillAIMod
         {
             while (!_isTTSServiceReady)
             {
-                yield return StartCoroutine(CheckTTSHealthOnce((ready) =>
+                yield return StartCoroutine(TTSClient.CheckTTSHealthOnce(_sovitsUrlConfig.Value,Logger,(ready) =>
                 {
                     _isTTSServiceReady = ready;
                 }));
@@ -906,126 +831,16 @@ namespace ChillAIMod
             }
         }
 
-        IEnumerator CheckTTSHealthOnce(Action<bool> onResult)
-        {
-            string ttsUrl = _sovitsUrlConfig.Value.TrimEnd('/') + "/tts";
-            string minimalJson = @"{""text"": ""test""}";
-            using (UnityWebRequest req = new UnityWebRequest(ttsUrl, "POST")) // 没有/ping能够检测服务是否启动，只能利用/tts发一个小包观测失败返回码
-            {
-                byte[] bodyRaw = Encoding.UTF8.GetBytes(minimalJson);
-                req.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                req.downloadHandler = new DownloadHandlerBuffer();
-                req.SetRequestHeader("Content-Type", "application/json");
-                req.timeout = 8;
-
-                yield return req.SendWebRequest();
-
-                bool isReady = false;
-                if (req.result == UnityWebRequest.Result.Success)
-                {
-                    isReady = true;
-                }
-                else if (req.responseCode == 422 || req.responseCode == 400) // 在我的电脑上返回400 bad request.
-                {
-                    isReady = true;
-                }
-                else
-                {
-                    // 404, 500, ConnectionError, Timeout 等 → 服务未就绪
-                    isReady = false;
-                }
-
-                if (isReady)
-                {
-                    Logger.LogDebug("[TTS Health] 检测到服务已启动 (返回 422/200 等)");
-                }
-                else
-                {
-                    string error = req.error ?? $"HTTP {req.responseCode}";
-                    Logger.LogDebug($"[TTS Health] 服务未就绪: {error}");
-                }
-
-                onResult?.Invoke(isReady);
-            }
-        }
-
-        // 【修改点 2: DownloadVoice 协程函数移除 apiKey 参数，并修复 DownloadHandler】
-        IEnumerator DownloadVoiceWithRetry(string textToSpeak, Action<AudioClip> onComplete, int maxRetries = 3, float timeoutSeconds = 30f)
-        {
-            Logger.LogInfo("[TTS] 开始生成语音...");
-
-            string url = _sovitsUrlConfig.Value + "/tts";
-            string refPath = _refAudioPathConfig.Value;
-
-            if (!File.Exists(refPath))
-            {
-                string defaultPath = Path.Combine(BepInEx.Paths.PluginPath, "ChillAIMod", "Voice.wav");
-                if (File.Exists(defaultPath)) refPath = defaultPath;
-                else
-                {
-                    Logger.LogError($"[TTS] 找不到参考音频: {refPath}");
-                    onComplete?.Invoke(null);
-                    yield break;
-                }
-            }
-
-            string jsonBody = $@"{{ 
-                ""text"": ""{EscapeJson(textToSpeak)}"", 
-                ""text_lang"": ""{_targetLangConfig.Value}"", 
-                ""ref_audio_path"": ""{EscapeJson(refPath)}"", 
-                ""prompt_text"": ""{EscapeJson(_promptTextConfig.Value)}"", 
-                ""prompt_lang"": ""{_promptLangConfig.Value}"" 
-            }}";
-
-            for (int attempt = 1; attempt <= maxRetries; attempt++)
-            {
-                using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
-                {
-                    byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-                    request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                    request.downloadHandler = new DownloadHandlerAudioClip(url, AudioType.WAV);
-                    request.SetRequestHeader("Content-Type", "application/json");
-                    request.timeout = (int)timeoutSeconds;
-
-                    var requestStartTime = DateTime.UtcNow;
-
-                    yield return request.SendWebRequest();
-
-                    var requestDuration = (DateTime.UtcNow - requestStartTime).TotalSeconds;
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        var clip = DownloadHandlerAudioClip.GetContent(request);
-                        if (clip != null)
-                        {
-                            Logger.LogInfo($"[TTS] 语音生成成功（第 {attempt} 次尝试）（耗时 {requestDuration:F2}s）");
-                            onComplete?.Invoke(clip);
-                            yield break; // 成功则退出
-                        }
-                    }
-
-                    Logger.LogWarning($"[TTS] 第 {attempt}/{maxRetries} 次尝试失败（耗时 {requestDuration:F2}s）: {request.error}");
-                    if (attempt < maxRetries)
-                    {
-                        yield return new WaitForSeconds(2f); // 重试前等待
-                    }
-                }
-            }
-
-            Logger.LogError("[TTS] 所有重试均失败，放弃生成语音");
-            onComplete?.Invoke(null);
-        }
-
         IEnumerator PlayNativeAnimation(string emotion, AudioClip voiceClip)
         {
-            if (_heroineService == null || _changeAnimSmoothMethod == null) yield break;
+            if (GameBridge._heroineService == null || GameBridge._changeAnimSmoothMethod == null) yield break;
 
             Logger.LogInfo($"[动画] 执行: {emotion}");
             float clipDuration = (voiceClip != null) ? voiceClip.length : 3.0f;
             // 1. 归位 (除了喝茶)
             if (emotion != "Drink")
             {
-                CallNativeChangeAnim(250);
+                GameBridge.CallNativeChangeAnim(250, Logger);
                 yield return new WaitForSecondsRealtime(0.2f);
             }
             if (voiceClip != null)
@@ -1052,7 +867,7 @@ namespace ChillAIMod
                 case "Agree": animID = 1301; break;
 
                 case "Drink":
-                    CallNativeChangeAnim(250);
+                    GameBridge.CallNativeChangeAnim(250 , Logger);
                     yield return new WaitForSecondsRealtime(0.5f);
                     animID = 256; // DrinkTea
                     break;
@@ -1063,72 +878,34 @@ namespace ChillAIMod
 
                 case "Wave":
                     animID = 5001;
-                    CallNativeChangeAnim(animID);
+                    GameBridge.CallNativeChangeAnim(animID , Logger);
 
                     // 等待抬手
                     yield return new WaitForSecondsRealtime(0.3f);
                     // 强制看玩家
-                    ControlLookAt(1.0f, 0.5f);
+                    GameBridge.ControlLookAt(1.0f, 0.5f);
 
                     // 等待动作或语音结束 (取长者)
                     float waitTime = Mathf.Max(clipDuration, 2.5f);
                     yield return new WaitForSecondsRealtime(waitTime);
 
                     // 归位
-                    CallNativeChangeAnim(250);
-                    RestoreLookAt();
+                    GameBridge.CallNativeChangeAnim(250 , Logger);
+                    GameBridge.RestoreLookAt();
 
                     _isAISpeaking = false;
                     yield break; // 退出
             }
 
             // 执行通用动作
-            CallNativeChangeAnim(animID);
+            GameBridge.CallNativeChangeAnim(animID , Logger);
 
             // 等待语音播完
             yield return new WaitForSecondsRealtime(clipDuration);
 
             // 恢复
-            RestoreLookAt();
+            GameBridge.RestoreLookAt();
             _isAISpeaking = false;
-        }
-
-        // --- 辅助方法 ---
-        void CallNativeChangeAnim(int id)
-        {
-            try { _changeAnimSmoothMethod.Invoke(_heroineService, new object[] { id }); }
-            catch (Exception ex) { Logger.LogError($"Anim Error: {ex.Message}"); }
-        }
-
-        void ControlLookAt(float scale, float speed)
-        {
-            try { _lookAtMethod.Invoke(_heroineService, new object[] { scale, speed, 0 }); }
-            catch { }
-        }
-
-        void RestoreLookAt()
-        {
-            if (_lookInitMethod != null) try { _lookInitMethod.Invoke(_heroineService, null); } catch { }
-        }
-
-        void FindHeroineService()
-        {
-            var allComponents = FindObjectsOfType<MonoBehaviour>();
-            foreach (var comp in allComponents)
-            {
-                if (comp.GetType().FullName == "Bulbul.HeroineService")
-                {
-                    _heroineService = comp;
-                    _cachedAnimator = comp.GetComponent<Animator>();
-
-                    _changeAnimSmoothMethod = comp.GetType().GetMethod("ChangeHeroineAnimationForInteger", BindingFlags.Public | BindingFlags.Instance);
-                    _lookInitMethod = comp.GetType().GetMethod("LookInitSlowly", BindingFlags.Public | BindingFlags.Instance);
-                    _lookAtMethod = comp.GetType().GetMethod("ChangeLookScaleAnimation", BindingFlags.Public | BindingFlags.Instance);
-
-                    if (_changeAnimSmoothMethod != null) Logger.LogWarning($"✅ 核心连接成功: {comp.gameObject.name}");
-                    return;
-                }
-            }
         }
 
         // ================= 【新增录音控制】 =================
@@ -1171,81 +948,42 @@ namespace ChillAIMod
             // 2. 剪裁有效音频 (去掉末尾的静音/空白部分)
             if (position <= 0) return; // 录音太短
 
-            AudioClip validClip = TrimAudioClip(_recordingClip, position);
+            AudioClip validClip = AudioUtils.TrimAudioClip(_recordingClip, position);
 
             // 3. 编码并发送
-            byte[] wavData = EncodeToWAV(validClip);
-            StartCoroutine(SendAudioToASR(wavData));
+            byte[] wavData = AudioUtils.EncodeToWAV(validClip);
+            StartCoroutine(ASRWorkflow(wavData));
         }
-
-        AudioClip TrimAudioClip(AudioClip original, int endPosition)
+        /// <summary>
+        /// ASR 业务流：负责调度网络请求和后续的 AI 响应
+        /// </summary>
+        IEnumerator ASRWorkflow(byte[] wavData)
         {
-            float[] data = new float[endPosition * original.channels];
-            original.GetData(data, 0);
+            _isProcessing = true; // 锁定 UI
+            string recognizedResult = "";
 
-            AudioClip newClip = AudioClip.Create("TrimmedVoice", endPosition, original.channels, original.frequency, false);
-            newClip.SetData(data, 0);
-            return newClip;
-        }
+            // A. 调用 ApiService 只负责拿回文字
+            yield return StartCoroutine(ASRClient.SendAudioToASR(
+                wavData,
+                _sovitsUrlConfig.Value,
+                Logger,
+                (text) => recognizedResult = text
+            ));
 
-        string ExtractContentRegex(string json)
-        {
-            try { var match = Regex.Match(json, "\"content\"\\s*:\\s*\"(.*?)\""); return match.Success ? Regex.Unescape(match.Groups[1].Value) : null; }
-            catch { return null; }
-        }
-
-        private string ExtractContentFromOllama(string jsonResponse)
-        {
-            try
+            // B. 根据拿回的结果，在主类决定下一步业务走向
+            if (!string.IsNullOrEmpty(recognizedResult))
             {
-                var match = Regex.Match(jsonResponse, "\"content\"\\s*:\\s*\"([^\"]*)\"");
-                if (match.Success)
-                {
-                    return Regex.Unescape(match.Groups[1].Value);
-                }
-                return null;
+                Logger.LogInfo($"[Workflow] ASR 成功，开始进入 AI 思考流程: {recognizedResult}");
+
+                // 这里触发 AI 处理流程
+                yield return StartCoroutine(AIProcessRoutine(recognizedResult));
             }
-            catch (Exception ex)
+            else
             {
-                Logger.LogError($"[Ollama] 解析失败: {ex.Message}");
-                return null;
+                Logger.LogWarning("[Workflow] ASR 未能识别到有效文本");
+                _isProcessing = false; // 如果识别失败，在这里解锁 UI
             }
         }
-
-        string EscapeJson(string s)
-        {
-            return s?.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n") ?? "";
-        }
-
-        GameObject CreateOverlayText(GameObject parent)
-        {
-            GameObject go = new GameObject(">>> AI_TEXT <<<");
-            go.transform.SetParent(parent.transform, false);
-            RectTransform rt = go.AddComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.sizeDelta = Vector2.zero;
-            Text txt = go.AddComponent<Text>();
-            txt.fontSize = 26;
-            txt.alignment = TextAnchor.UpperCenter;
-            txt.horizontalOverflow = HorizontalWrapMode.Wrap;
-            Font f = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            if (f == null) f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (f != null) txt.font = f;
-            return go;
-        }
-
-        void ForceShowWindow(GameObject target)
-        {
-            target.SetActive(true);
-            var p = target.transform.parent;
-            while (p != null && p.name != "Canvas")
-            {
-                p.gameObject.SetActive(true);
-                p = p.parent;
-            }
-            foreach (var c in target.GetComponentsInParent<CanvasGroup>()) c.alpha = 1f;
-            target.transform.parent.parent.localScale = Vector3.one;
-        }
-
         void OnApplicationQuit()
         {
             Logger.LogInfo("[Chill AI Mod] 退出中...");
@@ -1267,7 +1005,7 @@ namespace ChillAIMod
             {   
                 try
                 {
-                    KillProcessTree(_launchedTTSProcess);
+                    ProcessHelper.KillProcessTree(_launchedTTSProcess , Logger);
                     Logger.LogInfo("TTS 服务已关闭");
                 }
                 catch (Exception ex)
@@ -1276,111 +1014,7 @@ namespace ChillAIMod
                 }
             }
         }
-
-        private void KillProcessTree(Process process)
-        {
-            if (process == null || process.HasExited) return;
-
-            try
-            {
-                int pid = process.Id;
-                Logger.LogInfo($"[TTS Cleanup] 使用 taskkill 终止进程树 (PID: {pid})");
-
-                // 在新进程中执行 taskkill /T /F /PID <pid>
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = "taskkill",
-                    Arguments = $"/T /F /PID {pid}", // /T = 终止子进程, /F = 强制
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-
-                using (Process killer = Process.Start(psi))
-                {
-                    killer.WaitForExit(3000); // 等待最多 3 秒
-                }
-
-                Logger.LogInfo($"[TTS Cleanup] taskkill 执行完毕 (PID: {pid})");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning($"[TTS Cleanup] taskkill 失败: {ex.Message}");
-            }
-        }
-
-        // ================= 【新增 WAV 编码工具】 =================
-        private byte[] EncodeToWAV(AudioClip clip)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                // 1. 获取数据
-                float[] samples = new float[clip.samples * clip.channels];
-                clip.GetData(samples, 0);
-
-                // 2. 写入 WAV 头 (44 bytes)
-                int hz = clip.frequency;
-                int channels = clip.channels;
-                int samplesCount = samples.Length;
-
-                Byte[] riff = Encoding.UTF8.GetBytes("RIFF");
-                stream.Write(riff, 0, 4);
-
-                Byte[] chunkSize = BitConverter.GetBytes(samplesCount * 2 + 36);
-                stream.Write(chunkSize, 0, 4);
-
-                Byte[] wave = Encoding.UTF8.GetBytes("WAVE");
-                stream.Write(wave, 0, 4);
-
-                Byte[] fmt = Encoding.UTF8.GetBytes("fmt ");
-                stream.Write(fmt, 0, 4);
-
-                Byte[] subChunk1 = BitConverter.GetBytes(16);
-                stream.Write(subChunk1, 0, 4);
-
-                UInt16 one = 1;
-                Byte[] audioFormat = BitConverter.GetBytes(one);
-                stream.Write(audioFormat, 0, 2);
-
-                Byte[] numChannels = BitConverter.GetBytes(channels);
-                stream.Write(numChannels, 0, 2);
-
-                Byte[] sampleRate = BitConverter.GetBytes(hz);
-                stream.Write(sampleRate, 0, 4);
-
-                Byte[] byteRate = BitConverter.GetBytes(hz * channels * 2);
-                stream.Write(byteRate, 0, 4);
-
-                UInt16 blockAlign = (ushort)(channels * 2);
-                stream.Write(BitConverter.GetBytes(blockAlign), 0, 2);
-
-                UInt16 bps = 16;
-                Byte[] bitsPerSample = BitConverter.GetBytes(bps);
-                stream.Write(bitsPerSample, 0, 2);
-
-                Byte[] datastring = Encoding.UTF8.GetBytes("data");
-                stream.Write(datastring, 0, 4);
-
-                Byte[] subChunk2 = BitConverter.GetBytes(samplesCount * 2);
-                stream.Write(subChunk2, 0, 4);
-
-                // 3. 写入数据 (将 float -1.0~1.0 转换为 short -32768~32767)
-                Int16[] intData = new Int16[samplesCount];
-                Byte[] bytesData = new Byte[samplesCount * 2];
-                int rescaleFactor = 32767;
-
-                for (int i = 0; i < samplesCount; i++)
-                {
-                    intData[i] = (short)(samples[i] * rescaleFactor);
-                    Byte[] byteArr = BitConverter.GetBytes(intData[i]);
-                    byteArr.CopyTo(bytesData, i * 2);
-                }
-
-                stream.Write(bytesData, 0, bytesData.Length);
-                return stream.ToArray();
-            }
-        }
-
+        
         // ================= 【分层记忆系统相关方法】 =================
 
         /// <summary>

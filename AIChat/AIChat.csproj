@@ -93,7 +93,14 @@
   <ItemGroup>
     <Compile Include="AIMod.cs" />
     <Compile Include="HierarchicalMemory.cs" />
+    <Compile Include="Core\AudioUtils.cs" />
+    <Compile Include="Core\ResponseParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Services\ASRClient.cs" />
+    <Compile Include="Services\TTSClient.cs" />
+    <Compile Include="Services\ProcessHelper.cs" />
+    <Compile Include="Unity\GameBridge.cs" />
+    <Compile Include="Unity\UIHelper.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
