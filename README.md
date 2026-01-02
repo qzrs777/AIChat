@@ -4,30 +4,74 @@
 
 ## 特色
 - 使用任意兼容的聊天 API（如 OpenRouter/OpenAI）生成对话文本。
-- 使用本地部署的 SoVITS/TTS 服务（通过 /tts）生成语音（无需将 TTS Key 传到云端）。
+- 使用本地部署的 GPT-SoVITS/TTS 服务（通过 /tts）生成语音（无需将 TTS Key 传到云端）。
 - UI 内可调节音量、窗口尺寸、保存配置，支持拖拽调整大小与精确数值输入。
 - 要求 AI 输出严格格式：`[Emotion] ||| JAPANESE TEXT ||| CHINESE TRANSLATION`，插件根据情感切换动作并播放日语语音，显示中文字幕。
 - 若 AI 未按格式返回，只显示字幕并以思考动作代替语音（避免错误语言被 TTS 读出）。
 
-## 快速开始（最短路径}
-1. 下载
-   - 从仓库下载本项目发布的压缩包或编译后的 DLL。
-   - 从 (https://github.com/RVC-Boss/GPT-SoVITS) 下载 VITS 模型（本地模型用于生成语音，否则会“无声”）。
+## 安装 Mod 本体
+1. 下载 Mod
+   - 从 [Releases](https://github.com/qzrs777/AIChat/releases) 下载本项目发布的压缩包，并解压。
+     - 注：其核心部分 `AIChat.dll` 也可从本仓库源码构建得到。
 
-2. 拷贝文件到游戏目录
-   - 右键游戏 -> 管理 -> 浏览本地文件（或直接定位游戏根目录）。
-   - 将压缩包内的 BEPINEX 等指定文件内容复制到游戏根目录。
-   - 运行一次游戏（用于生成插件目录结构）。
+2. 安装 Mod
+   - 在 Steam 右键游戏 -> 管理 -> 浏览本地文件（或直接定位游戏根目录）。
+   - 将压缩包内的 `BepInEx_*` 下的内容复制到游戏根目录。
+     - Linux 用户请注意：Mod 能被加载的原理是，Windows 中的一些程序在启动时，同目录下的 DLL 文件（这里的是 `winhttp.dll`）比原本的 DLL 文件具有更高的优先级，从而被加载；但是在 Linux 下，Proton 自己的 DLL 文件具有更高的优先级，会无视同目录下的 `winhttp.dll`。所以，你需要在 Steam 的此游戏的设置里，将启动选项填写为 `WINEDLLOVERRIDES="winhttp=n,b" %command%` （其中 `winhttp` 就是 `winhttp.dll` 的文件名）。
+   - 运行一次游戏（用于生成插件目录结构，这包括 `BepInEx` 目录下的 `config`、`core`、`patchers`、`plugins` 等目录）。
+   - 将 `AIChat.dll` 放入 `BepInEx` 下的 `plugins` 目录中。
 
-3. 安装 Mod
-   - 在游戏根目录下找到或等待生成的 `plugins` 文件夹，将本项目的 DLL（或整个 ChillAIMod 文件夹）放入 `plugins`。
+3. 配置 Mod
+   - 打开游戏，按 F9 键调出 Mod 的界面。
+   - 配置好 API URL 与 API Key 以及 Model Name 并保存，此时就可以在“与聪音对话”的文本框里进行对话了（仅文字；下一节将配置语音）。
 
-4. 启动并运行本地 TTS（SoVITS）
-   - 启动你本地的 SoVITS/TTS 服务，确保可访问（默认插件配置为 `http://127.0.0.1:9880`）。
-   - 如果你的 TTS 启动器只有一个 txt 脚本或没有可执行文件，可创建一个 `.bat` 来启动（示例）
-     - 示例（Windows）
-       - 打开记事本，写入你的启动命令，保存为 `run_tts.bat`，双击运行。
-   - 在游戏内或插件设置中填写 TTS 地址、参考音频路径（RefAudioPath）、EPIT/model 等参数。
+## 语音配置（可选）
+本项目依赖 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) 的 WebAPI v2 来生成语音，而它的文档着重于 Webui 和在线云服务，就我们的目的（本地部署 WebAPI v2）而言较为混乱，所以这里提供较为详细的说明。
+
+1. 安装 GPT-SoVITS：
+   - Windows 用户：根据 GPT-SoVITS 的[文档](https://www.yuque.com/baicaigongchang1145haoyuangong/ib3g1e/dkxgpiy9zb96hob4)，直接下载整合包，解压后运行 `run_api.bat` 即可。如果没有 `run_api.bat`，可以自己建立一个 `run_api.bat.txt` 文件，编辑内容如下：
+     ```bat
+     @echo off
+     .\runtime\python.exe api_v2.py -a 127.0.0.1 -p 9880
+     pause
+     ```
+     然后重命名文件，将 `.txt` 后缀去掉即可。
+   - Linux 用户：Nvidia 显卡用户推荐使用 Docker，因为 Docker 具有稳定、易迁移、方便统一管理的特性。若不想使用 Docker 或显卡不是 Nvidia 的，则需要使用 conda 来运行，请自行参考 [GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS#linux)，**注意不是文档也不是 User guide**；也可参考本仓库的 `GPT-SoVITS-Linux` 目录。以下是使用 Docker 的步骤：
+     - 安装 Docker、Docker Compose、Nvidia Container Toolkit 三件套，方法分别参见 [Install | Docker Docs](https://docs.docker.com/engine/install/)、[Plugin | Docker Docs](https://docs.docker.com/compose/install/linux/#install-using-the-repository) 和 [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
+     - 克隆 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)：
+       ```bash
+       git clone --depth=1 https://github.com/RVC-Boss/GPT-SoVITS
+       cd GPT-SoVITS
+       ```
+     - 运行 APIv2 服务：
+       > 此项目提供的 Docker 镜像的最新版本，虽然也能用，比起 Git 仓库的版本还是旧不少。你可以考虑从克隆的 Git 仓库本地构建一下 Docker 镜像，以获得真正的最新版本，方法见其 `README.md` 的 `Building the Docker Image Locally` 一节。
+
+       ```bash
+       docker compose run --rm --service-ports GPT-SoVITS-CU126 python api_v2.py -a 0.0.0.0 -p 9880
+       ```
+       （注：Nvidia 50 系显卡请将上面的 `126` 改为 `128`）
+
+2. 放置音频文件
+   - 将前面下载过的 Mod 压缩包中的 `Voice_MainScenario_27_016.wav` 放到 `GPT-SoVITS` 的根目录下（对于 Windows 用户是整合包解压后的根目录，对于 Linux 用户是 Git 仓库的根目录）。
+   - 测试：在浏览器打开[测试链接](http://127.0.0.1:9880/tts?text=%E3%81%93%E3%82%93%E3%81%AB%E3%81%A1%E3%81%AF%E3%80%81%E3%81%8A%E5%85%83%E6%B0%97%E3%81%A7%E3%81%99%E3%81%8B%EF%BC%9F%E4%BB%8A%E6%97%A5%E3%82%82%E4%B8%80%E7%B7%92%E3%81%AB%E9%A0%91%E5%BC%B5%E3%82%8A%E3%81%BE%E3%81%97%E3%82%87%E3%81%86%EF%BC%81&text_lang=ja&ref_audio_path=Voice_MainScenario_27_016.wav&prompt_text=%E5%90%9B%E3%81%8C%E9%9B%86%E4%B8%AD%E3%81%97%E3%81%9F%E6%99%82%E3%81%AE%E3%82%B7%E3%83%BC%E3%82%BF%E6%B3%A2%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%97%E3%81%A6%E3%80%81%E3%83%AA%E3%83%B3%E3%82%AF%E3%82%92%E3%81%A4%E3%81%AA%E3%81%8E%E7%9B%B4%E3%81%9B%E3%81%B0%E5%85%83%E9%80%9A%E3%82%8A%E3%81%AB%E3%81%AA%E3%82%8B%E3%81%AF%E3%81%9A%E3%80%82&prompt_lang=ja&speed_factor=1.0)
+   > 上面浏览器打开的是经过转义的链接，下面是测试链接的实际内容：
+   > ```url
+   > http://127.0.0.1:9880/tts?text=こんにちは、お元気ですか？今日も一緒に頑張りましょう！&text_lang=ja&ref_audio_path=Voice_MainScenario_27_016.wav&prompt_text=君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。&prompt_lang=ja&speed_factor=1.0
+   > ```
+   > 它的基本作用是让这个 tts 服务模仿 `ref_audio_path` 所指定的音频文件（台词为 `prompt_text` 的值）来合成 `text` 的语音音频。
+   > 实际上，这里测试使用的是 GTP-SoVITS 的 WebAPI 的 GET 用法，详见 [`api_v2.py`](https://github.com/RVC-Boss/GPT-SoVITS/blob/main/api_v2.py) 的注释。
+
+   稍等片刻，将会下载一个大约 300 KiB 大小的 `tts.wav` 文件，播放它应当能清晰地听到三句与游戏角色相似的日语语音，时长约 5 秒。
+   > 或者，直接在命令行用 `ffplay`（由 FFmpeg 提供）：
+   > ```bash
+   > ffplay -nodisp -autoexit 'http://127.0.0.1:9880/tts?text=こんにちは、お元気ですか？今日も一緒に頑張りましょう！&text_lang=ja&ref_audio_path=Voice_MainScenario_27_016.wav&prompt_text=君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。&prompt_lang=ja&speed_factor=1.0&streaming_mode=True'
+   > ```
+
+3. 在 Mod 中配置
+  - 确保上一步测试成功后，在游戏按 F9 键调出 Mod 的界面中，将 `音频路径(.wav)` 的值改为 `Voice_MainScenario_27_016.wav`，并且勾选 `不检测音频文件路径` 即可。
+  - 下面两个参数默认都已填好，**一般不要改动**，如下：
+    - 音频台词（即 wav 音频文件的原文）：`君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。`
+    - TTS Service Url：`http://127.0.0.1:9880`
 
 ## 配置（游戏内设置面板 / Config 文件键）
 插件通过 BepInEx 配置项保存，下列为重要项（在设置面板中可直接修改）
@@ -89,7 +133,7 @@ UI 其他
 
 ## 安全与隐私
 - 聊天内容会发送到你配置的聊天 API（如 OpenRouter/OpenAI）；请注意 API Key 与隐私策略。
-- TTS 请求默认向本地 SoVITS 服务发起（不上传语音到第三方），更安全且延迟低。
+- TTS 请求默认向本地 GPT-SoVITS 服务发起（不上传语音到第三方），更安全且延迟低。
 
 ## 示例 Persona（默认已内置）
 插件内置了一个示例 SystemPrompt，示范如何强制 AI 始终以日语语音输出，并给出格式约束（请在设置中编辑以适配你的角色）。
