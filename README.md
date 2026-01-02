@@ -34,7 +34,7 @@
    pause
    ```
    然后重命名文件，将 `.txt` 后缀去掉即可。
-   - 安装（Linux 以及 WSL 用户）：Nvidia 显卡用户推荐使用 Docker，因为 Docker 具有稳定、易迁移、方便统一管理的特性。若不想使用 Docker 或显卡不是 Nvidia 的，则需要使用 conda 来运行，请自行参考 [GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS#linux)，**注意不是文档也不是 User guide**。以下是使用 Docker 的步骤：
+   - 安装（Linux 用户）：Nvidia 显卡用户推荐使用 Docker，因为 Docker 具有稳定、易迁移、方便统一管理的特性。若不想使用 Docker 或显卡不是 Nvidia 的，则需要使用 conda 来运行，请自行参考 [GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS#linux)，**注意不是文档也不是 User guide**。以下是使用 Docker 的步骤：
      - 安装 Docker、Docker Compose、Nvidia Container Toolkit 三件套，方法参见 [Debian | Docker Docs](https://docs.docker.com/engine/install/debian/#installation-methods)、[Plugin | Docker Docs](https://docs.docker.com/compose/install/linux/#install-using-the-repository) 和 [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
      - 克隆 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)：
        ```bash
@@ -50,7 +50,7 @@
        ```bash
        docker compose run --rm --service-ports GPT-SoVITS-CU128 python api_v2.py -a 0.0.0.0 -p 9880
        ```
-   - 准备音频文件：将前面下载过的 Mod 压缩包中的 `Voice_MainScenario_27_016.wav` 放到前面克隆的 `GPT-SoVITS` 仓库的根目录下。
+   - 准备音频文件：将前面下载过的 Mod 压缩包中的 `Voice_MainScenario_27_016.wav` 放到 `GPT-SoVITS` 的根目录下（对于 Windows 用户是整合包解压后的根目录，对于 Linux 用户是 Git 仓库的根目录）。
    - 测试：在浏览器打开[测试链接](http://127.0.0.1:9880/tts?text=%E3%81%93%E3%82%93%E3%81%AB%E3%81%A1%E3%81%AF%E3%80%81%E3%81%8A%E5%85%83%E6%B0%97%E3%81%A7%E3%81%99%E3%81%8B%EF%BC%9F%E4%BB%8A%E6%97%A5%E3%82%82%E4%B8%80%E7%B7%92%E3%81%AB%E9%A0%91%E5%BC%B5%E3%82%8A%E3%81%BE%E3%81%97%E3%82%87%E3%81%86%EF%BC%81&text_lang=ja&ref_audio_path=Voice_MainScenario_27_016.wav&prompt_text=%E5%90%9B%E3%81%8C%E9%9B%86%E4%B8%AD%E3%81%97%E3%81%9F%E6%99%82%E3%81%AE%E3%82%B7%E3%83%BC%E3%82%BF%E6%B3%A2%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%97%E3%81%A6%E3%80%81%E3%83%AA%E3%83%B3%E3%82%AF%E3%82%92%E3%81%A4%E3%81%AA%E3%81%8E%E7%9B%B4%E3%81%9B%E3%81%B0%E5%85%83%E9%80%9A%E3%82%8A%E3%81%AB%E3%81%AA%E3%82%8B%E3%81%AF%E3%81%9A%E3%80%82&prompt_lang=ja&speed_factor=1.0)
    （附：前面是经过转义的链接，下面是测试链接的实际内容）
    ```url
