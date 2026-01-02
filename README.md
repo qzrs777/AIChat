@@ -30,28 +30,24 @@
 
 1. 安装 GPT-SoVITS：
    - Windows 用户：根据 GPT-SoVITS 的[文档](https://www.yuque.com/baicaigongchang1145haoyuangong/ib3g1e/dkxgpiy9zb96hob4)，直接下载整合包，解压后运行 `run_api.bat` 即可。如果没有 `run_api.bat`，可以自己建立一个 `run_api.bat.txt` 文件，编辑内容如下：
-   ```bat
-   @echo off
-   .\runtime\python.exe api_v2.py -a 127.0.0.1 -p 9880
-   pause
-   ```
-   然后重命名文件，将 `.txt` 后缀去掉即可。
+     ```bat
+     @echo off
+     .\runtime\python.exe api_v2.py -a 127.0.0.1 -p 9880
+     pause
+     ```
+     然后重命名文件，将 `.txt` 后缀去掉即可。
    - Linux 用户：Nvidia 显卡用户推荐使用 Docker，因为 Docker 具有稳定、易迁移、方便统一管理的特性。若不想使用 Docker 或显卡不是 Nvidia 的，则需要使用 conda 来运行，请自行参考 [GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS#linux)，**注意不是文档也不是 User guide**。以下是使用 Docker 的步骤：
-   - 安装 Docker、Docker Compose、Nvidia Container Toolkit 三件套，方法参见 [Debian | Docker Docs](https://docs.docker.com/engine/install/debian/#installation-methods)、[Plugin | Docker Docs](https://docs.docker.com/compose/install/linux/#install-using-the-repository) 和 [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-   - 克隆 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)：
-   ```bash
-   git clone --depth=1 https://github.com/RVC-Boss/GPT-SoVITS
-   cd GPT-SoVITS
-   ```
-   - 运行 APIv2 服务：
-     - Nvidia 50 系之前的显卡：
+     - 安装 Docker、Docker Compose、Nvidia Container Toolkit 三件套，方法参见 [Debian | Docker Docs](https://docs.docker.com/engine/install/debian/#installation-methods)、[Plugin | Docker Docs](https://docs.docker.com/compose/install/linux/#install-using-the-repository) 和 [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+     - 克隆 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)：
      ```bash
-     docker compose run --rm --service-ports GPT-SoVITS-CU126 python api_v2.py -a 0.0.0.0 -p 9880
+     git clone --depth=1 https://github.com/RVC-Boss/GPT-SoVITS
+     cd GPT-SoVITS
      ```
-     - Nvidia 50 系显卡：
-     ```bash
-     docker compose run --rm --service-ports GPT-SoVITS-CU128 python api_v2.py -a 0.0.0.0 -p 9880
-     ```
+     - 运行 APIv2 服务：
+       ```bash
+       docker compose run --rm --service-ports GPT-SoVITS-CU126 python api_v2.py -a 0.0.0.0 -p 9880
+       ```
+       （注：Nvidia 50 系显卡请将上面的 `126` 改为 `128`）
 
 2. 放置音频文件
    - 将前面下载过的 Mod 压缩包中的 `Voice_MainScenario_27_016.wav` 放到 `GPT-SoVITS` 的根目录下（对于 Windows 用户是整合包解压后的根目录，对于 Linux 用户是 Git 仓库的根目录）。
@@ -63,17 +59,17 @@
    > 它的基本作用是让这个 tts 服务模仿 `ref_audio_path` 所指定的音频文件（台词为 `prompt_text` 的值）来合成 `text` 的语音音频。
    > 实际上，这里测试使用的是 GTP-SoVITS 的 WebAPI 的 GET 用法，详见 [`api_v2.py`](https://github.com/RVC-Boss/GPT-SoVITS/blob/main/api_v2.py) 的注释。
 
-   稍等片刻，将会下载一个大约 300 KiB 大小的 `tts.wav` 文件，播放它应当能听到三句与游戏角色相似的日语语音。
+   稍等片刻，将会下载一个大约 300 KiB 大小的 `tts.wav` 文件，播放它应当能清晰地听到三句与游戏角色相似的日语语音，时长约 5 秒。
    > 或者，直接在命令行用 `ffplay`（由 FFmpeg 提供）：
-   > ```
+   > ```bash
    > ffplay -nodisp -autoexit 'http://127.0.0.1:9880/tts?text=こんにちは、お元気ですか？今日も一緒に頑張りましょう！&text_lang=ja&ref_audio_path=Voice_MainScenario_27_016.wav&prompt_text=君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。&prompt_lang=ja&speed_factor=1.0&streaming_mode=True'
    > ```
 
 3. 在 Mod 中配置
-- 测试成功后，在游戏按 F9 键调出 Mod 的界面中，将 `音频路径(.wav)` 的值改为 `Voice_MainScenario_27_016.wav`，并且勾选 `不检测音频文件路径` 即可。
-- 下面两个参数默认都已填好，**一般不要改动**，如下：
-  - 音频台词（即 wav 音频文件的原文）：`君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。`
-  - TTS Service Url：`http://127.0.0.1:9880`
+  - 确保上一步测试成功后，在游戏按 F9 键调出 Mod 的界面中，将 `音频路径(.wav)` 的值改为 `Voice_MainScenario_27_016.wav`，并且勾选 `不检测音频文件路径` 即可。
+  - 下面两个参数默认都已填好，**一般不要改动**，如下：
+    - 音频台词（即 wav 音频文件的原文）：`君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。`
+    - TTS Service Url：`http://127.0.0.1:9880`
 
 ## 配置（游戏内设置面板 / Config 文件键）
 插件通过 BepInEx 配置项保存，下列为重要项（在设置面板中可直接修改）
