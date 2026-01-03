@@ -47,7 +47,7 @@ jobs:
       - name: Update Pre-Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
+          tag_name: preview
           name: "Preview Build"
           body: |
             [![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build.yml)

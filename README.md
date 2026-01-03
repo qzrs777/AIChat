@@ -209,7 +209,7 @@
     ```bash
     git ls-files --others --ignored --exclude-standard
     ```
-- 在线构建：本项目由 GitHub Action 每日自动构建（也可由维护者手动触发），见 [Release Preview Build](https://github.com/qzrs777/AIChat/releases/tag/latest)。[![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build.yml)
+- 在线构建：本项目由 GitHub Action 每日自动构建（也可由维护者手动触发），见 [Release Preview Build](https://github.com/qzrs777/AIChat/releases/tag/preview)。[![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build.yml)
 
 ## 调试与常见问题
 Mod 日志为游戏目录下的 `BepInEx` 中的 `LogOutput.log`。
