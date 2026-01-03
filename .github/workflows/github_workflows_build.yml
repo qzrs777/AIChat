@@ -1,0 +1,42 @@
+name: Build and Package AIChat Mod
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout AIChat
+        uses: actions/checkout@v4
+
+      - name: Checkout AIChat-build-resource
+        uses: actions/checkout@v4
+        with:
+          repository: clsty/AIChat-build-resource
+          path: AIChat-build-resource
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete p7zip-full
+
+      - name: Build AIChat.dll
+        run: |
+          make GAME_ROOT="${{ github.workspace }}/AIChat-build-resource/buildenv/mokgamedir"
+
+      - name: Copy AIChat.dll to assets
+        run: |
+          cp AIChat/bin/Release/AIChat.dll AIChat-build-resource/assets/
+
+      - name: Package assets
+        run: |
+          cd AIChat-build-resource/assets
+          7z a ../../AIChatMod.7z ./*
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIChatMod
+          path: AIChatMod.7z
