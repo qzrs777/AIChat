@@ -147,8 +147,19 @@ UI 其他
 插件内置了一个示例 SystemPrompt（见 [AIChat/AIMod.cs 的 DefaultPersona](https://github.com/qzrs777/AIChat/blob/57f8352377798334b44c5c3a3c8298ae2381b0dc/AIChat/AIMod.cs#L85-L110)），示范如何强制 AI 始终以日语语音输出，并给出格式约束（请在设置中编辑以适配你的角色）。
 
 ## 实验功能
-### 中文（或其他语言）语音输出
-注：由于原语音样本为日语，中文语音输出的效果可能不太好。
+### 其他语言的语音输出
+注：
+- 由于原语音样本为日语，其他语音输出的效果可能不太好。
+- 仅能输出 GPT-SoVITS 支持的语言，以下引用自 [RVC-Boss/GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS)：
+  > Language dictionary:
+  >
+  > - 'zh': Chinese
+  > - 'ja': Japanese
+  > - 'en': English
+  > - 'ko': Korean
+  > - 'yue': Cantonese
+
+- 这里以中文 `zh` 为例，其他语言同理。
 
 步骤：
 - 在 Mod 的界面里将 Persona 调整一下，以适配中文输出。例如：
