@@ -1,0 +1,36 @@
+name: Pull Request Check Build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout AIChat
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+
+      - name: Build AIChat.dll
+        run: |
+          make GAME_ROOT="${{ github.workspace }}/build-resource/buildenv/mokgamedir"
+
+      - name: Copy AIChat.dll to assets
+        run: |
+          cp AIChat/bin/Release/AIChat.dll build-resource/assets/
+
+      - name: Upload PR Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIChatMod-PR-${{ github.event.pull_request.number }}
+          path: build-resource/assets/
+          retention-days: 5
