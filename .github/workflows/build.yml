@@ -35,12 +35,24 @@ jobs:
           cd build-resource/assets/
           zip -r ../../AIChatMod.zip .
 
+      - name: Get commit info
+        id: info
+        run: |
+          echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          #echo "hash_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "time=$(git log -1 --date=format-local:'%Y-%m-%d %H:%M:%S UTC' --format='%cd')" >> $GITHUB_OUTPUT
+        env:
+          TZ: UTC
+
       - name: Update Pre-Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: "Preview Build"
-          body: "此为无固定版本号的预览版本，最近一次构建时间：${{ github.event.head_commit.timestamp }}"
+          body: |
+            此为无固定版本号的预览版本。
+            最近一次提交: ${{ steps.info.outputs.hash }}
+            提交时间 (UTC): ${{ steps.info.outputs.time }}
           prerelease: true
           files: AIChatMod.zip
         env:
