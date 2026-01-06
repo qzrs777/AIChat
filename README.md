@@ -74,14 +74,14 @@
      > ```
      > 它的基本作用是让这个 TTS 服务模仿 `ref_audio_path` 所指定的音频文件（台词为 `prompt_text` 的值）来合成 `text` 的语音音频。
      > 实际上，这里测试使用的是 WebAPI v2 的 GET 用法，详见 [`api_v2.py`](https://github.com/RVC-Boss/GPT-SoVITS/blob/main/api_v2.py) 的注释。
-     > 另外，若你的命令行有 `ffplay`（由 FFmpeg 提供），这样测试可以直接听到声音，避免下载文件再打开的麻烦：
+     > 另外，若你的命令行有 `ffplay`（由 FFmpeg 提供），这样测试可以直接听到声音（不需要下载音频文件再手动播放）：
      > ```bash
      > ffplay -nodisp -autoexit 'http://127.0.0.1:9880/tts?text=こんにちは、お元気ですか？今日も一緒に頑張りましょう！&text_lang=ja&ref_audio_path=Voice_MainScenario_27_016.wav&prompt_text=君が集中した時のシータ波を検出して、リンクをつなぎ直せば元通りになるはず。&prompt_lang=ja&speed_factor=1.0&streaming_mode=True'
      > ```
 
-     - 测试过程中，GSV 会自动下载 `https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin` 到 GSV 目录下的 `GPT_SoVITS/pretrained_models/fast_langdetect/lid.176.bin`。
+     - 测试过程中，GSV 会自动下载 `https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin` 到 GSV 根目录下的 `GPT_SoVITS/pretrained_models/fast_langdetect/lid.176.bin`。
        - Docker 用户可将目录 `fast_langdetect` 映射出去以实现数据持久化。
-     - 稍等片刻，将会下载一个大约 300 KiB 大小的 `tts.wav` 文件，播放它应当能清晰地听到三句与游戏角色相似的日语语音，时长约 5 秒。
+     - 稍等片刻，浏览器将会下载一个大约 300 KiB 大小的 `tts.wav` 文件，播放它应当能清晰地听到三句与游戏角色相似的日语语音，时长约 5 秒。
 
 3. 在 Mod 中配置
    - **请务必确保上一步语音测试成功。否则，说明 TTS 服务未正常运行（在解决此问题之前，继续下一步是无意义的）。**

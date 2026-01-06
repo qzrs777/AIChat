@@ -35,6 +35,8 @@ jobs:
         run: |
           make GAME_ROOT="${{ github.workspace }}/build-resource/buildenv/mokgamedir"
           cp AIChat/bin/Release/AIChat.dll build-resource/assets/
+          # 小白未必知道怎么打开 md 文件
+          cp README.md build-resource/assets/README.md.txt
 
       - name: Zip Artifact
         run: |
