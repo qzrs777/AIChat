@@ -2,9 +2,9 @@ name: Build and Package AIChat Mod
 
 on:
   workflow_dispatch:
-  schedule:
-    # 每日北京时间 11:00 (即 UTC 时间 03:00) 触发
-    - cron: '0 3 * * *'
+  push:
+    branches: [ main ]
+    paths: [ AIChat/**,build-resource/buildenv/** ]
 
 permissions:
   contents: write
@@ -23,13 +23,9 @@ jobs:
           packages: mono-complete zip pandoc
 
       - name: Download Unity assemblies from NuGet
-        run: |
-          cd build-resource/buildenv
-          bash download-unityengine.sh
+        run: build-resource/buildenv/download-unityengine.sh
       - name: Download BepInEx
-        run: |
-          cd build-resource/buildenv
-          bash download-bepinex.sh
+        run: build-resource/buildenv/download-bepinex.sh
 
       - name: Build AIChat.dll
         run: |
@@ -37,9 +33,7 @@ jobs:
           cp AIChat/bin/Release/AIChat.dll build-resource/assets/
 
       - name: Add README.html
-          # github.css 来自 https://github.com/otsaloma/markdown-css
-        run: |
-          pandoc -f gfm --css=build-resource/buildenv/github.css --standalone --to=html5 --output=build-resource/assets/README.html --highlight-style=haddock --embed-resources README.md
+        run: build-resource/buildenv/build-README.sh
 
       - name: Zip Artifact
         run: |
@@ -50,7 +44,6 @@ jobs:
         id: info
         run: |
           echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-          #echo "hash_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "time=$(git log -1 --date=format-local:'%Y-%m-%d %H:%M:%S UTC' --format='%cd')" >> $GITHUB_OUTPUT
         env:
           TZ: UTC
@@ -62,7 +55,7 @@ jobs:
           name: "Preview Build"
           body: |
             [![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build.yml)
-            此为无固定版本号的预览版本，每日自动构建，也可由维护者手动触发。
+            此为无固定版本号的预览版本，当有更新推送到特定目录时触发构建，也可由维护者手动触发构建。
 
             此构建的 Commit 信息：
             - HASH： ${{ steps.info.outputs.hash }}

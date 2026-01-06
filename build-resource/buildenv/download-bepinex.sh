@@ -7,15 +7,16 @@ set -e
 BEPINEX_VERSION="${BEPINEX_VERSION:-5.4.23.4}"
 BEPINEX_URL="https://github.com/BepInEx/BepInEx/releases/download/v${BEPINEX_VERSION}/BepInEx_win_x64_${BEPINEX_VERSION}.zip"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
 ASSETS_DIR="${SCRIPT_DIR}/../assets"
-BUILD_ENV_DIR="${SCRIPT_DIR}/mokgamedir"
+MOKGAME_DIR="${SCRIPT_DIR}/mokgamedir"
 
 echo "Downloading BepInEx v${BEPINEX_VERSION}..."
 
 # Function to download and extract BepInEx
 download_and_extract() {
     local url="$1"
-    local tmp_dir=$(mktemp -d)
+    local tmp_dir=/tmp/bepinex-deps
     
     cd "${tmp_dir}" || return 1
     echo "Downloading from ${url}..." >&2
@@ -40,7 +41,7 @@ download_and_extract() {
 }
 
 # Download BepInEx for build environment (core libraries for compilation)
-if [ ! -d "${BUILD_ENV_DIR}/BepInEx" ]; then
+if [ ! -d "${MOKGAME_DIR}/BepInEx" ]; then
     echo "Downloading BepInEx for build environment..."
     
     TMP_DIR=$(download_and_extract "${BEPINEX_URL}")
@@ -51,8 +52,8 @@ if [ ! -d "${BUILD_ENV_DIR}/BepInEx" ]; then
     
     # Copy only BepInEx/core directory for compilation
     if [ -d "${TMP_DIR}/BepInEx/core" ]; then
-        mkdir -p "${BUILD_ENV_DIR}/BepInEx"
-        cp -r "${TMP_DIR}/BepInEx/core" "${BUILD_ENV_DIR}/BepInEx/"
+        mkdir -p "${MOKGAME_DIR}/BepInEx"
+        cp -r "${TMP_DIR}/BepInEx/core" "${MOKGAME_DIR}/BepInEx/"
         echo "BepInEx core libraries installed for build environment."
     else
         echo "Error: BepInEx/core directory not found in downloaded archive" >&2

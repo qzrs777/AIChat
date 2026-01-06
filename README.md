@@ -1,20 +1,20 @@
 # Chill AI Mod
 
-**为游戏添加基于 LLM + VITS 的 AI 全语音对话（BepInEx 插件），让游戏角色支持实时语音与表情动作联动。**
+**为游戏添加基于 LLM + VITS + ASR 的 AI 全语音对话（BepInEx 插件），让游戏角色支持实时语音与表情动作联动。**
 
 ## 特色
-- 使用任意兼容的聊天 API（如 OpenRouter/OpenAI/Ollama）生成对话文本。
-- 支持使用本地部署的 GPT-SoVITS WebAPIv2 生成语音（不上传语音到第三方），无需将 TTS Key 传到云端，更安全且延迟低。
+- 使用任意兼容的 LLM API（如 OpenRouter/OpenAI/Ollama）生成对话文本。
+- 使用自部署的 GPT-SoVITS 的 WebAPI v2 生成语音。
 - 支持语音输入（由 Faster Whisper ASR 模型实现语音识别）。
 - UI 内可调节音量、窗口尺寸、保存配置，支持拖拽调整大小与精确数值输入。
-- 要求 AI 输出严格格式：`[Emotion] ||| JAPANESE TEXT ||| CHINESE TRANSLATION`，插件根据情感切换动作并播放日语语音，显示中文字幕。若 AI 未按格式返回，只显示字幕并以思考动作代替语音（避免错误语句被 TTS 读出）。
 
 ## 安装说明
 ### 安装 Mod 本体
 1. 下载 Mod
    - 从 [Releases](https://github.com/qzrs777/AIChat/releases) 下载 `AIChatMod.zip` 并解压。
-     - 推荐使用带版本号的稳定版；
-       Preview Build 属于预览版，比稳定版更新，相对来说有 bug 的概率会更高一些（实际结果也可能反过来）。
+     - 推荐使用带版本号的[最新稳定版](https://github.com/qzrs777/AIChat/releases/latest)；
+     - 或者使用由 GitHub Actions 在线构建的[最新预览版](https://github.com/qzrs777/AIChat/releases/tag/preview)。[![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build.yml)
+     - 预览版比稳定版更新，相对来说有 bug 的概率会更高一些，而实际结果也可能反过来。
 
 2. 安装 BepInEx 前置
    - 在 Steam 右键游戏 -> 管理 -> 浏览本地文件（或直接定位游戏根目录）。
@@ -47,7 +47,7 @@
      pause
      ```
      然后重命名文件，将 `.txt` 后缀去掉即可。
-   - Linux 用户：Nvidia 显卡用户推荐使用 Docker，因为 Docker 具有稳定、易迁移、方便统一管理的特性。若不想使用 Docker 或显卡不是 Nvidia 的，则需要使用 conda 来运行，请自行参考 [GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS#linux)，**注意不是文档也不是 User guide**；也可适当参考本仓库的 `GPT-SoVITS-Linux` 目录。以下是使用 Docker 的步骤：
+   - Linux 用户：Nvidia 显卡用户推荐使用 Docker（目前官方提供的 Docker 镜像仅支持 Nvidia 显卡），因为 Docker 具有稳定、易迁移、方便统一管理的特性。若不想使用 Docker 或显卡不是 Nvidia 的，则需要使用 conda 来运行，请自行参考 [GPT-SoVITS 的 README](https://github.com/RVC-Boss/GPT-SoVITS#linux)，**注意不是文档也不是 User guide**；也可适当参考本仓库的 `GPT-SoVITS-Linux` 目录。以下是使用 Docker 的步骤：
      - 安装 Docker、Docker Compose、Nvidia Container Toolkit 三件套，方法分别参见 [Install | Docker Docs](https://docs.docker.com/engine/install/)、[Plugin | Docker Docs](https://docs.docker.com/compose/install/linux/#install-using-the-repository) 和 [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
      - 克隆 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)：
        ```bash
@@ -55,7 +55,7 @@
        cd GPT-SoVITS
        ```
      - 运行 APIv2 服务：
-       > 此项目提供的 Docker 镜像的最新版本，虽然也能用，比起 Git 仓库的版本还是旧不少。你可以考虑从克隆的 Git 仓库本地构建一下 Docker 镜像，以获得真正的最新版本，方法见其 `README.md` 的 `Building the Docker Image Locally` 一节。
+       > 此项目提供的 Docker 镜像的最新版本，虽然也能用，比起 Git 仓库的版本还是旧不少。你可以考虑从克隆的 Git 仓库本地构建一下 Docker 镜像，以获得真正的最新版本，方法见其 `README.md` 的 `Building the Docker Image Locally` 一节（友情提示，请做好调试与折腾的心理准备）。
 
        ```bash
        docker compose run --rm --service-ports GPT-SoVITS-CU126 python api_v2.py -a 0.0.0.0 -p 9880
@@ -193,7 +193,6 @@
     ```bash
     git ls-files --others --ignored --exclude-standard
     ```
-- 在线构建：本项目由 GitHub Action 每日自动构建（也可由维护者手动触发），见 [Release Preview Build](https://github.com/qzrs777/AIChat/releases/tag/preview)。[![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build.yml)
 
 ## 问题排查
 前提说明：
@@ -223,6 +222,8 @@
 - [BepInEx](https://github.com/BepInEx/BepInEx)：Unity/XNA 游戏 Mod 框架
   - 许可：LGPL-2.1
 - [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)：用于语音合成
+  - 许可：MIT
+- [otsaloma/markdown-css](https://github.com/otsaloma/markdown-css)：用于生成 `README.html`
   - 许可：MIT
 
 本项目在构建时还用到以下项目：

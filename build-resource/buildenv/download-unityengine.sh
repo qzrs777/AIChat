@@ -3,6 +3,10 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+MOKGAME_DIR="${SCRIPT_DIR}/mokgamedir"
+
 UNITY_DLL=()
 UNITY_DLL+=(UnityEngine.dll)
 UNITY_DLL+=(UnityEngine.CoreModule.dll)
@@ -15,7 +19,7 @@ UNITY_DLL+=(UnityEngine.UIModule.dll)
 UNITY_DLL+=(UnityEngine.UnityWebRequestModule.dll)
 UNITY_DLL+=(UnityEngine.UnityWebRequestAudioModule.dll)
 UNITY_PKG_PATH="$HOME/.nuget/packages/unityengine.modules/2021.3.33/lib/net45"
-TARGET_DIR="$(pwd)/mokgamedir/Chill With You_Data/Managed"
+TARGET_DIR="${MOKGAME_DIR}/Chill With You_Data/Managed"
 mkdir -p "$TARGET_DIR"
 mkdir -p /tmp/unity-deps
 cd /tmp/unity-deps

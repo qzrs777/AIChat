@@ -20,18 +20,12 @@ jobs:
           packages: mono-complete zip pandoc
 
       - name: Download Unity assemblies from NuGet
-        run: |
-          cd build-resource/buildenv
-          bash download-unityengine.sh
+        run: build-resource/buildenv/download-unityengine.sh
       - name: Download BepInEx
-        run: |
-          cd build-resource/buildenv
-          bash download-bepinex.sh
+        run: build-resource/buildenv/download-bepinex.sh
 
       - name: Add README.html
-          # github.css 来自 https://github.com/otsaloma/markdown-css
-        run: |
-          pandoc -f gfm --css=build-resource/buildenv/github.css --standalone --to=html5 --output=build-resource/assets/README.html --highlight-style=haddock --embed-resources README.md
+        run: build-resource/buildenv/build-README.sh
 
       - name: Upload PR Build Artifact
         uses: actions/upload-artifact@v4
