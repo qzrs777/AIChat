@@ -17,14 +17,18 @@ jobs:
       - name: Cache APT packages
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: mono-complete zip pandoc
+          packages: dotnet-sdk-8.0 python3 python3-pip zip pandoc
+
+      - name: Install .NET SDK
+        run: |
+          sudo apt install dotnet-sdk-8.0
 
       - name: Cache Unity assemblies
         id: cache-unity
         uses: actions/cache@v4
         with:
           path: build-resource/buildenv/mokgamedir/Chill With You_Data/Managed
-          key: unity-assemblies-${{ hashFiles('build-resource/buildenv/download-unityengine.sh') }}
+          key: unity-assemblies-${{ hashFiles('install-deps.py') }}
           restore-keys: |
             unity-assemblies-
       - name: Cache BepInEx
@@ -32,20 +36,20 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build-resource/assets/BepInEx_win_x64
-          key: bepinex-${{ hashFiles('build-resource/buildenv/download-bepinex.sh') }}
+          key: bepinex-${{ hashFiles('install-deps.py') }}
           restore-keys: |
             bepinex-
-      - name: Download Unity assemblies from NuGet
-        if: steps.cache-unity.outputs.cache-hit != 'true'
-        run: build-resource/buildenv/download-unityengine.sh
-      - name: Download BepInEx
-        if: steps.cache-bepinex.outputs.cache-hit != 'true'
-        run: build-resource/buildenv/download-bepinex.sh
+
+      - name: Run install-deps.py
+        if: steps.cache-unity.outputs.cache-hit != 'true' || steps.cache-bepinex.outputs.cache-hit != 'true'
+        run: |
+          python3 install-deps.py
 
       - name: Build AIChat.dll
         run: |
-          make GAME_ROOT="${{ github.workspace }}/build-resource/buildenv/mokgamedir"
-          cp AIChat/bin/Release/AIChat.dll build-resource/assets/
+          cd ${{ github.workspace }}
+          dotnet build -c Release
+          cp AIChat/bin/Release/**/AIChat.dll build-resource/assets/
 
       - name: Add README.html
         run: build-resource/buildenv/build-README.sh
