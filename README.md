@@ -189,7 +189,9 @@
   - 安装依赖：
     - `make`
     - `msbuild`（没有 `msbuild` 可用 `xbuild` 代替，在 Debian 13 下 `mono-complete` 提供了 `xbuild`）
+  - 确保游戏已经安装，且 `BepInEx` 前置已安装。
   - 在仓库根目录下运行 `make` 即可，生成的文件位于 `AIChat/bin/Release/AIChat.dll` 。
+    - `make` 默认假设游戏目录是默认路径。若游戏目录不是默认路径，则应当运行 `make GAME_ROOT=<你的游戏路径>`。
   - 提示：运行此命令可查看所有被 `.gitignore` 忽略的文件（在构建时所生成的文件一般都需要被忽略）：
     ```bash
     git ls-files --others --ignored --exclude-standard
