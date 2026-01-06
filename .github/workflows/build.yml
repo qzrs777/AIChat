@@ -22,9 +22,27 @@ jobs:
         with:
           packages: mono-complete zip pandoc
 
+      - name: Cache Unity assemblies
+        id: cache-unity
+        uses: actions/cache@v4
+        with:
+          path: build-resource/buildenv/mokgamedir/Chill With You_Data/Managed
+          key: unity-assemblies-${{ hashFiles('build-resource/buildenv/download-unityengine.sh') }}
+          restore-keys: |
+            unity-assemblies-
+      - name: Cache BepInEx
+        id: cache-bepinex
+        uses: actions/cache@v4
+        with:
+          path: build-resource/assets/BepInEx_win_x64
+          key: bepinex-${{ hashFiles('build-resource/buildenv/download-bepinex.sh') }}
+          restore-keys: |
+            bepinex-
       - name: Download Unity assemblies from NuGet
+        if: steps.cache-unity.outputs.cache-hit != 'true'
         run: build-resource/buildenv/download-unityengine.sh
       - name: Download BepInEx
+        if: steps.cache-bepinex.outputs.cache-hit != 'true'
         run: build-resource/buildenv/download-bepinex.sh
 
       - name: Build AIChat.dll

@@ -35,5 +35,5 @@ secrets.json
 !/build-resource/buildenv/mokgamedir/Chill With You_Data/Managed/UnityEngine.UI.dll
 
 # BepInEx 虽然是开源的，也不应包含在仓库内。
-/build-resource/buildenv/mokgamedir/BepInEx/
-/build-resource/assets/BepInEx_win_x64_*/
+/build-resource/assets/BepInEx_win_x64/**
+!/build-resource/assets/BepInEx_win_x64/LICENSE
