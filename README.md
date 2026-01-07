@@ -183,25 +183,33 @@
 - 保存配置。
 
 ## 构建
-本 Mod 的核心 `AIChat.dll` 可从仓库构建。首先要克隆仓库到本地，然后：
-- 在 Windows 下构建。
-  - 安装依赖：
-    - python (python --version验证)
-    - .NET SDK (dotnet --version验证)
-  - 在终端中 执行`python install-deps.py`
-  - 在终端中 执行`dotnet build` (构建release版本: `dotnet build -c Release`)
-- 在 Linux 下可使用 `make` 构建。
-  - 安装依赖：
-    - `make`
-    - `msbuild`（没有 `msbuild` 可用 `xbuild` 代替，在 Debian 13 下 `mono-complete` 提供了 `xbuild`）
-  - 确保游戏已经安装，且 `BepInEx` 前置已安装。
-  - 在仓库根目录下运行 `make` 即可，生成的文件位于 `AIChat/bin/Release/AIChat.dll` 。
-    - `make` 默认假设游戏目录是默认路径。若游戏目录不是默认路径，则应当运行 `make GAME_ROOT=<你的游戏路径>`。
+本 Mod 的核心 `AIChat.dll` 可从仓库构建。
+
+### 本地构建
+以下构建流程适合 Windows 与 Linux。
+
+- 克隆仓库到本地。
+- 安装依赖：
+  - python（`python --version` 验证）
+  - .NET SDK（`dotnet --version` 验证）
+- 正式构建：
+  ```sh
+  python build-resource/fetch.py
+  dotnet build
+  ```
+  - 若要构建 Release 版本，则改为运行 `dotnet build -c Release`
+  - 在 Linux 下可改为运行 `make`。
+- 构建产物位于 `AIChat/bin/Release/net472/AIChat.dll` 。
   - 提示：运行此命令可查看所有被 `.gitignore` 忽略的文件（在构建时所生成的文件一般都需要被忽略）：
     ```bash
     git ls-files --others --ignored --exclude-standard
     ```
-- 在线构建：Fork 本仓库，并在你的仓库中启用 GitHub Actions，再手动触发 `Build and Package AIChat Mod` 这个 workflow 即可在线构建，并自动发布到 Releases 中（tag 固定为 `preview`）。此 workflow 还可通过推送涉及特定路径的提交来触发，参见 [build.yml](https://github.com/qzrs777/AIChat/blob/main/.github/workflows/build.yml)。
+### 在线构建
+- Fork 本仓库；
+- 在你的仓库中启用 GitHub Actions；
+- 手动触发 `Build and Package AIChat Mod` 这个 workflow 即可在线构建，并自动发布到 Releases 中（tag 固定为 `preview`）。
+
+此 workflow 还可通过推送涉及特定路径的提交来触发，参见 [build.yml](https://github.com/qzrs777/AIChat/blob/main/.github/workflows/build.yml)。
 
 ## 问题排查
 前提说明：
