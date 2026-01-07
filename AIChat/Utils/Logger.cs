@@ -4,7 +4,7 @@ using BepInEx;
 using BepInEx.Logging;
 #endif
 
-namespace AIChatMod.Utils {
+namespace AIChat.Utils {
     public interface Logger
     {
         void LogInfo(string message);
@@ -29,16 +29,16 @@ namespace AIChatMod.Utils {
             {
                 if (logSource == null)
                 {
-                    _logSource = BepInEx.Logging.Logger.CreateLogSource("AIChatMod");
+                    _logSource = BepInEx.Logging.Logger.CreateLogSource("AIChat");
                 }
                 else{
                     _logSource = logSource;
                 }
             }
 
-            public void LogInfo(string message) => _logSource.LogInfo($"[INFO] {message}");
-            public void LogWarning(string message) => _logSource.LogWarning($"[WARNING] {message}");
-            public void LogError(string message) => _logSource.LogError($"[ERROR] {message}");
+            public void LogInfo(string message) => _logSource.LogInfo(message);
+            public void LogWarning(string message) => _logSource.LogWarning(message);
+            public void LogError(string message) => _logSource.LogError(message);
         }
 #else
         public static void Init()
@@ -51,21 +51,21 @@ namespace AIChatMod.Utils {
             public void LogInfo(string message)
             {
                 Console.ForegroundColor = System.ConsoleColor.Cyan;
-                Console.WriteLine($"[AIChatMod] [INFO] {DateTime.Now:HH:mm:ss} {message}");
+                Console.WriteLine($"[AIChat] [INFO] {DateTime.Now:HH:mm:ss} {message}");
                 Console.ResetColor();
             }
 
             public void LogWarning(string message)
             {
                 Console.ForegroundColor = System.ConsoleColor.Yellow;
-                Console.WriteLine($"[AIChatMod] [WARNING] {DateTime.Now:HH:mm:ss} {message}");
+                Console.WriteLine($"[AIChat] [WARNING] {DateTime.Now:HH:mm:ss} {message}");
                 Console.ResetColor();
             }
 
             public void LogError(string message)
             {
                 Console.ForegroundColor = System.ConsoleColor.Red;
-                Console.WriteLine($"[AIChatMod] [ERROR] {DateTime.Now:HH:mm:ss} {message}");
+                Console.WriteLine($"[AIChat] [ERROR] {DateTime.Now:HH:mm:ss} {message}");
                 Console.ResetColor();
             }
         }

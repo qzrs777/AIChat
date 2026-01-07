@@ -1,4 +1,4 @@
-﻿using AIChatMod.Utils;
+﻿using AIChat.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;

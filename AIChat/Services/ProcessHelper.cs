@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AIChatMod.Utils;
+using AIChat.Utils;
 
 namespace AIChat.Services
 {

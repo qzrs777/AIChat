@@ -1,5 +1,5 @@
 ﻿using AIChat.Core;
-using AIChatMod.Utils;
+using AIChat.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
