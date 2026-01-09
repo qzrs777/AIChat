@@ -99,6 +99,10 @@ namespace ChillAIMod
         private string _tempHeightString;
         private string _tempVolumeString; // 新增：用于音量输入的临时字符串
 
+        // 新增：(26/1/9) api_key用*代替
+        private bool _showApiKey = false; // 默认隐藏
+        private string _currentApiKeyDisplay = "";
+
         // 默认人设
         private const string DefaultPersona = @"
             You are Satone（さとね）, a girl who loves writing novels and is full of imagination.
@@ -203,6 +207,8 @@ namespace ChillAIMod
             _tempWidthString = _windowWidthConfig.Value.ToString("F0");
             _tempHeightString = _windowHeightConfig.Value.ToString("F0");
             _tempVolumeString = _voiceVolumeConfig.Value.ToString("F2");
+            _currentApiKeyDisplay = new string('*', _apiKeyConfig.Value.Length);
+
             string cleanPath = _TTSServicePathConfig.Value.Replace("\"", "").Trim();
             if (_LaunchTTSServiceConfig.Value && File.Exists(_TTSServicePathConfig.Value))
             {
@@ -421,9 +427,23 @@ namespace ChillAIMod
                     
                     GUILayout.Label("API URL：");
                     _chatApiUrlConfig.Value = GUILayout.TextField(_chatApiUrlConfig.Value, GUILayout.Height(elementHeight), GUILayout.MinWidth(50f));
+                    
                     if (!_useOllama.Value) {
                         GUILayout.Label("API Key：");
-                        _apiKeyConfig.Value = GUILayout.TextField(_apiKeyConfig.Value, GUILayout.Height(elementHeight), GUILayout.MinWidth(50f));
+                        // 新增：添加 API Key 安全输入
+                        GUILayout.BeginHorizontal();
+                        string displayKey = _showApiKey ? _apiKeyConfig.Value : _currentApiKeyDisplay;
+                        string newApiKey = GUILayout.TextField(displayKey, GUILayout.Height(elementHeight), GUILayout.MinWidth(50f));
+
+                        if (_showApiKey && newApiKey != _apiKeyConfig.Value){
+                                _apiKeyConfig.Value = newApiKey;
+                                _currentApiKeyDisplay = new string('*', newApiKey.Length);
+                        }
+                        if  (GUILayout.Button(_showApiKey ? "显示" : "隐藏", GUILayout.Width(btnWidth * 1.5f), GUILayout.Height(elementHeight)))
+                        {
+                            _showApiKey = !_showApiKey;
+                        }
+                        GUILayout.EndHorizontal();
                     }
                     GUILayout.Label("模型名称：");
                     _modelConfig.Value = GUILayout.TextField(_modelConfig.Value, GUILayout.Height(elementHeight), GUILayout.MinWidth(50f));
