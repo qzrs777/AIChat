@@ -20,6 +20,7 @@ namespace AIChat.Utils
         public string SystemPrompt;
         public string UserPrompt;
         public bool UseLocalOllama;
+        public bool UseXnneHangLab;
         public bool LogApiRequestBody;
         public bool FixApiPathForThinkMode;
         public ThinkMode ThinkMode;
@@ -33,6 +34,7 @@ namespace AIChat.Utils
             string systemPrompt = "",
             string userPrompt = "",
             bool useLocalOllama = false,
+            bool useXnneHangLab = false,
             bool logApiRequestBody = false,
             ThinkMode thinkMode = ThinkMode.Default,
             HierarchicalMemory hierarchicalMemory = null,
@@ -46,6 +48,7 @@ namespace AIChat.Utils
             SystemPrompt = systemPrompt;
             UserPrompt = userPrompt;
             UseLocalOllama = useLocalOllama;
+            UseXnneHangLab = useXnneHangLab;
             LogApiRequestBody = logApiRequestBody;
             ThinkMode = thinkMode;
             HierarchicalMemory = hierarchicalMemory;
@@ -95,7 +98,7 @@ namespace AIChat.Utils
                 ret.Success = true;
             }
 
-            if (!ret.Success) Log.Warning($"[格式错误] AI 回复不符合格式: {response}");
+            if (!ret.Success) Log.Warning($"[格式错误] AI 回复不符合格式：{response}");
 
             return ret;
         }
@@ -106,26 +109,36 @@ namespace AIChat.Utils
             string userPromptWithMemory = GetContextWithMemory(requestContext.HierarchicalMemory, requestContext.UserPrompt);
 
             string jsonBody;
-            string extraJson = requestContext.UseLocalOllama ? $@",""stream"": false" : "";
-            // 【深度思考参数】
-            extraJson += GetThinkParameterJson(requestContext.ThinkMode);
+            
+            // XnneHangLab Chat Server：簡單的 OpenAI 兼容格式，不需要 stream 參數，也不需要 model（由後端配置）
+            if (requestContext.UseXnneHangLab)
+            {
+                jsonBody = $@"{{ ""messages"": [ {{ ""role"": ""system"", ""content"": ""{ResponseParser.EscapeJson(requestContext.SystemPrompt)}"" }}, {{ ""role"": ""user"", ""content"": ""{ResponseParser.EscapeJson(userPromptWithMemory)}"" }} ] }}";
+            }
+            else
+            {
+                // Ollama 或其他 OpenAI 兼容 API
+                string extraJson = requestContext.UseLocalOllama ? $@",""stream"": false" : "";
+                // 【深度思考参数】
+                extraJson += GetThinkParameterJson(requestContext.ThinkMode);
 
-            if (requestContext.ModelName.Contains("gemma")) {
-                // 将 persona 作为背景信息放在 user 消息的最前面
-                string finalPrompt = $"[System Instruction]\n{requestContext.SystemPrompt}\n\n[User Message]\n{userPromptWithMemory}";
-                jsonBody = $@"{{ ""model"": ""{requestContext.ModelName}"", ""messages"": [ {{ ""role"": ""user"", ""content"": ""{ResponseParser.EscapeJson(finalPrompt)}"" }} ]{extraJson} }}";
-            } else {
-                // Gemini 或 Ollama (如果是 Llama3 等) 通常支持 system role
-                jsonBody = $@"{{ ""model"": ""{requestContext.ModelName}"", ""messages"": [ {{ ""role"": ""system"", ""content"": ""{ResponseParser.EscapeJson(requestContext.SystemPrompt)}"" }}, {{ ""role"": ""user"", ""content"": ""{ResponseParser.EscapeJson(userPromptWithMemory)}"" }} ]{extraJson} }}";
+                if (requestContext.ModelName.Contains("gemma")) {
+                    // 将 persona 作为背景信息放在 user 消息的最前面
+                    string finalPrompt = $"[System Instruction]\n{requestContext.SystemPrompt}\n\n[User Message]\n{userPromptWithMemory}";
+                    jsonBody = $@"{{ ""model"": ""{requestContext.ModelName}"", ""messages"": [ {{ ""role"": ""user"", ""content"": ""{ResponseParser.EscapeJson(finalPrompt)}"" }} ]{extraJson} }}";
+                } else {
+                    // Gemini 或 Ollama (如果是 Llama3 等) 通常支持 system role
+                    jsonBody = $@"{{ ""model"": ""{requestContext.ModelName}"", ""messages"": [ {{ ""role"": ""system"", ""content"": ""{ResponseParser.EscapeJson(requestContext.SystemPrompt)}"" }}, {{ ""role"": ""user"", ""content"": ""{ResponseParser.EscapeJson(userPromptWithMemory)}"" }} ]{extraJson} }}";
+                }
             }
 
-            Log.Info($"[记忆系统] 启用状态: {requestContext.HierarchicalMemory != null}");
+            Log.Info($"[记忆系统] 启用状态：{requestContext.HierarchicalMemory != null}");
             // 【日志】打印完整的请求体（如果启用）
             if (requestContext.LogApiRequestBody)
             {
                 // 【调试日志】显示完整的请求内容
-                Log.Info($"[发送给LLM的完整内容]\n========================================\n[System Prompt]\n{requestContext.SystemPrompt}\n\n[User Content]\n{userPromptWithMemory}\n========================================");
-                Log.Info($"[API请求] 完整请求体:\n{jsonBody}");
+                Log.Info($"[发送给 LLM 的完整内容]\n========================================\n[System Prompt]\n{requestContext.SystemPrompt}\n\n[User Content]\n{userPromptWithMemory}\n========================================");
+                Log.Info($"[API 请求] 完整请求体:\n{jsonBody}");
             }
 
             return jsonBody;
@@ -167,12 +180,18 @@ namespace AIChat.Utils
         }
 
         /// <summary>
-        /// 获取适合当前think模式的API URL
+        /// 获取适合当前 think 模式的 API URL
         /// </summary>
         public static string GetApiUrlForThinkMode(LLMRequestContext requestContext)
         {
             string baseUrl = requestContext.ApiUrl;
-            // 如果启用了API路径修正，且think模式不是Default，需要使用Ollama原生API (/api/chat)
+            // XnneHangLab Chat Server 不需要修改 URL
+            if (requestContext.UseXnneHangLab)
+            {
+                return baseUrl;
+            }
+            
+            // 如果启用了 API 路径修正，且 think 模式不是 Default，需要使用 Ollama 原生 API (/api/chat)
             if (requestContext.FixApiPathForThinkMode && requestContext.ThinkMode != ThinkMode.Default)
             {
                 // 将 /v1/chat/completions 替换为 /api/chat
@@ -181,7 +200,7 @@ namespace AIChat.Utils
                     baseUrl = baseUrl.Replace("/v1/chat/completions", "/api/chat");
                     Log.Info($"[Think Mode] 切换到 Ollama 原生 API: {baseUrl}");
                 }
-                // 如果URL已经是 /api/chat 或其他格式，保持不变
+                // 如果 URL 已经是 /api/chat 或其他格式，保持不变
             }
             
             return baseUrl;

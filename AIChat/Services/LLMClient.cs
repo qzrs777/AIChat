@@ -20,7 +20,8 @@ namespace AIChat.Services
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
-                if (!requestContext.UseLocalOllama)
+                // XnneHangLab Chat Server 不需要 API Key，Ollama 也不需要
+                if (!requestContext.UseLocalOllama && !requestContext.UseXnneHangLab)
                 {
                     request.SetRequestHeader("Authorization", "Bearer " + requestContext.ApiKey);
                 }

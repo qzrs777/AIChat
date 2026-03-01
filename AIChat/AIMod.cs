@@ -514,7 +514,11 @@ namespace ChillAIMod
                     
                     if (_useXnneHangLab.Value)
                     {
-                        GUILayout.Label("默认为 XnneHangLab Chat Server 本地部署时的地址，如果需要远程使用，直接替换为远程地址即可。(删空重置默认)", GUILayout.Height(elementHeight));
+
+
+                        GUILayout.Label("默认为 XnneHangLab Chat Server 本地部署时的地址。", GUILayout.Height(elementHeight));
+                        GUILayout.Label("如果需要远程使用，直接替换为远程地址即可。(删空重置默认)", GUILayout.Height(elementHeight));
+
                     }
                     
                     if (!_useOllama.Value && !_useXnneHangLab.Value) {
@@ -917,6 +921,7 @@ namespace ChillAIMod
                 SystemPrompt = _personaConfig.Value,
                 UserPrompt = prompt,
                 UseLocalOllama = _useOllama.Value,
+                UseXnneHangLab = _useXnneHangLab.Value,
                 LogApiRequestBody = _logApiRequestBodyConfig.Value,
                 ThinkMode = _thinkModeConfig.Value,
                 HierarchicalMemory = _experimentalMemoryConfig.Value ? _hierarchicalMemory : null,
@@ -935,9 +940,21 @@ namespace ChillAIMod
                 requestContext,
                 rawResponse =>
                 {
-                    fullResponse = requestContext.UseLocalOllama
-                        ? ResponseParser.ExtractContentFromOllama(rawResponse)
-                        : ResponseParser.ExtractContentRegex(rawResponse);
+                    // XnneHangLab Chat Server 返回 OpenAI 兼容格式 JSON
+                    // 暫時用 ExtractContentRegex 解析 content 字段，保持邏輯一致性
+                    // TODO: 以後改用 JsonUtility 直接解析
+                    if (requestContext.UseXnneHangLab)
+                    {
+                        fullResponse = ResponseParser.ExtractContentRegex(rawResponse);
+                    }
+                    else if (requestContext.UseLocalOllama)
+                    {
+                        fullResponse = ResponseParser.ExtractContentFromOllama(rawResponse);
+                    }
+                    else
+                    {
+                        fullResponse = ResponseParser.ExtractContentRegex(rawResponse);
+                    }
                     success = true;
                 },
                 (errorMsg, responseCode) =>
@@ -1288,6 +1305,7 @@ namespace ChillAIMod
                 SystemPrompt = "你是一个专业的文本总结助手。",
                 UserPrompt = prompt,
                 UseLocalOllama = _useOllama.Value,
+                UseXnneHangLab = _useXnneHangLab.Value,
                 LogApiRequestBody = _logApiRequestBodyConfig.Value,
                 ThinkMode = _thinkModeConfig.Value,
                 HierarchicalMemory = null,
@@ -1299,9 +1317,20 @@ namespace ChillAIMod
                 requestContext,
                 rawResponse => 
                 {
-                    string summary = requestContext.UseLocalOllama
-                        ? ResponseParser.ExtractContentFromOllama(rawResponse)
-                        : ResponseParser.ExtractContentRegex(rawResponse);
+                    // XnneHangLab Chat Server 返回純文本，不需要特殊解析
+                    string summary;
+                    if (requestContext.UseXnneHangLab)
+                    {
+                        summary = rawResponse;
+                    }
+                    else if (requestContext.UseLocalOllama)
+                    {
+                        summary = ResponseParser.ExtractContentFromOllama(rawResponse);
+                    }
+                    else
+                    {
+                        summary = ResponseParser.ExtractContentRegex(rawResponse);
+                    }
                     onComplete?.Invoke(summary);
                 },
                 (errorMsg, responseCode) => 
