@@ -207,7 +207,7 @@ namespace ChillAIMod
             // --- 翻译配置 ---
             _enableTranslationConfig = Config.Bind("5. Translation", "EnableTranslation", false,
                 "开启翻译（开启后请删掉系统提示词，无需利用提示词回复双语）");
-            _deeplxUrlConfig = Config.Bind("5. Translation", "DeepLX_Url", "http://127.0.0.1:1188/translate",
+            _deeplxUrlConfig = Config.Bind("5. Translation", "DeepLX_Url", "http://127.0.0.1:12393/translate/deeplx",
                 "DeepLX 翻译服务 URL");
             _translateTargetLangConfig = Config.Bind("5. Translation", "TranslateTargetLang", "ZH",
                 "翻译目标语言（如 ZH=中文，EN=英文，JA=日文）");
@@ -1144,11 +1144,9 @@ namespace ChillAIMod
             var waitShort = new WaitForSeconds(5f);  // 未连接时
             var waitLong  = new WaitForSeconds(30f); // 已连接时
 
-            // 从 translate URL 提取 scheme+host+port 拼 /health，只算一次
-            string healthUrl = _deeplxUrlConfig.Value;
-            Uri uri;
-            if (Uri.TryCreate(_deeplxUrlConfig.Value, UriKind.Absolute, out uri))
-                healthUrl = uri.Scheme + "://" + uri.Host + ":" + uri.Port + "/health";
+            // 在 translate URL 末尾直接拼 /health
+            // 例：http://127.0.0.1:12393/translate/deeplx → http://127.0.0.1:12393/translate/deeplx/health
+            string healthUrl = _deeplxUrlConfig.Value.TrimEnd('/') + "/health";
 
             bool lastState = false;
 
@@ -1156,8 +1154,8 @@ namespace ChillAIMod
             {
                 bool isReady = false;
 
-                // HEAD 请求：只看响应码，不读 body，最轻量
-                using (UnityWebRequest req = UnityWebRequest.Head(healthUrl))
+                // GET 请求探测 /health，不使用返回 body
+                using (UnityWebRequest req = UnityWebRequest.Get(healthUrl))
                 {
                     req.timeout = 5;
                     yield return req.SendWebRequest();
