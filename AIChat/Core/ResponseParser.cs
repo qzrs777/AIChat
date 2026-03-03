@@ -85,6 +85,39 @@ namespace AIChat.Core
             }
             return sb.ToString();
         }
+
+        // =========================================================================================
+        // 【新增】按中文标点断句（用于流式 TTS）
+        // =========================================================================================
+        /// <summary>
+        /// 按中文标点（。！？！）分割文本为句子数组
+        /// </summary>
+        /// <param name="text">原始文本</param>
+        /// <returns>句子数组</returns>
+        public static string[] SplitByChinesePunctuation(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return new string[0];
+            }
+
+            // 按中文句号、问号、感叹号分割，保留分隔符
+            char[] separators = new char[] { '。', '？', '！', '!' };
+            string[] parts = text.Split(separators, StringSplitOptions.RemoveEmptyEntries);
+            
+            // 过滤空句和纯空格句
+            var sentences = new List<string>();
+            foreach (var part in parts)
+            {
+                string trimmed = part.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    sentences.Add(trimmed);
+                }
+            }
+            
+            return sentences.ToArray();
+        }
     }
 }
 
