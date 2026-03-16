@@ -182,6 +182,33 @@
 - 展开高级设置，将 `合成语音语言（text_lang）` 改为 `zh`，并取消勾选`检测合成语音文本是否为日文`。
 - 保存配置。
 
+## 对外接口（供其他 Mod 调用）
+
+已提供一组公开 API，便于像 ChillPatcher 这样的插件在运行时联动 AIChat。
+
+- 插件 GUID：`com.username.chillaimod`
+- API 接口定义：`AIChat/Interop/AIChatPublicApi.cs`
+- 实现类：`ChillAIMod.AIMod`
+
+可调用能力：
+
+- 配置读取：`GetAllConfigValues()` / `GetConfigValue(key)`
+- 配置写入：`TrySetConfigValue(key, value, out error)`
+- 配置落盘：`TrySaveConfig(out error)`
+- 控制台显隐：`SetConsoleVisible(visible, out error)` / `GetConsoleVisible()`
+- 记忆清理：`TryClearMemory(out error)`
+- 文本对话触发：`TryStartTextConversation(text, inputSource, out error)`
+- 语音输入触发（WAV 字节）：`TryStartVoiceConversationFromWav(wavData, inputSource, out error)`
+- 回调事件：`ConversationCompleted`
+
+其中 `ConversationCompleted` 会返回结构化结果（情绪标签、语音文本、字幕文本、是否调用 TTS、错误码等）。
+
+说明：
+
+- 推荐调用方使用“软依赖”方式（通过 BepInEx Chainloader + 反射获取实例）进行调用。
+- 未安装 AIChat 时应直接降级，不抛异常。
+- 本仓库中的 ChillPatcher 已提供参考桥接实现：`Chill/Integration/AIChatBridge.cs`。
+
 ## 构建
 本 Mod 的核心 `AIChat.dll` 可从仓库构建。
 
