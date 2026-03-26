@@ -19,10 +19,14 @@ namespace AIChat.Core
         {
             try
             {
-                var match = Regex.Match(jsonResponse, "\"content\"\\s*:\\s*\"([^\"]*)\"");
+                // 使用 SingleLine 模式让 . 匹配换行符，避免 \n 截断
+                var match = Regex.Match(jsonResponse, "\"content\"\\s*:\\s*\"(.*?)\"(?=\\s*[,}])", RegexOptions.Singleline);
                 if (match.Success)
                 {
-                    return Regex.Unescape(match.Groups[1].Value);
+                    string content = Regex.Unescape(match.Groups[1].Value);
+                    // 去掉内容中的换行符（模型偶尔在标签后输出换行）
+                    content = content.Replace("\n", " ").Replace("\r", "").Trim();
+                    return content;
                 }
                 return null;
             }

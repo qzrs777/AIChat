@@ -232,7 +232,22 @@ namespace AIChat.Unity
         public static bool CallNativeChangeTrigger(string trigger)
         {
             if (_changeAnimTriggerMethod == null) return false;
-            try { _changeAnimTriggerMethod.Invoke(_heroineService, new object[] { trigger }); return true; }
+            try
+            {
+                // 获取方法参数类型（AnimationType 枚举）
+                var paramType = _changeAnimTriggerMethod.GetParameters()[0].ParameterType;
+                if (paramType.IsEnum)
+                {
+                    // 将字符串转换为枚举值
+                    var enumValue = Enum.Parse(paramType, trigger);
+                    _changeAnimTriggerMethod.Invoke(_heroineService, new object[] { enumValue });
+                }
+                else
+                {
+                    _changeAnimTriggerMethod.Invoke(_heroineService, new object[] { trigger });
+                }
+                return true;
+            }
             catch (Exception ex) { Log.Error($"Trigger Error: {ex.Message}"); return false; }
         }
 
