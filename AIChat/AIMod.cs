@@ -923,19 +923,20 @@ Response format MUST be:
         {
             _isProcessing = true;
 
-            // 1. 获取并处理 UI（使用缓存避免 Find 在隐藏对象上失败）
+            // 1. 获取并处理 UI
             if (_cachedCanvas == null) _cachedCanvas = GameObject.Find("Canvas");
             if (_cachedCanvas == null) { _isProcessing = false; yield break; }
-            if (_cachedOriginalTextTrans == null)
-            {
-                _cachedOriginalTextTrans = _cachedCanvas.transform.Find("StorySystemUI/MessageWindow/NormalTextParent/NormalTextMessage");
-            }
-            // 静音模式下临时恢复 StorySystemUI 以显示 Mod 字幕
+            // 静音模式下先临时恢复 StorySystemUI（否则 Find 找不到子对象）
             bool wasStoryUIHidden = false;
             if (_muteGameNativeAudio.Value && _storySystemUI != null && !_storySystemUI.activeSelf)
             {
                 _storySystemUI.SetActive(true);
                 wasStoryUIHidden = true;
+            }
+            // 再缓存文本组件引用
+            if (_cachedOriginalTextTrans == null)
+            {
+                _cachedOriginalTextTrans = _cachedCanvas.transform.Find("StorySystemUI/MessageWindow/NormalTextParent/NormalTextMessage");
             }
             Transform originalTextTrans = _cachedOriginalTextTrans;
             if (originalTextTrans == null) { _isProcessing = false; yield break; }
