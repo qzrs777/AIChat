@@ -18,12 +18,21 @@ using AIChat.Services;
 using AIChat.Unity;
 using System.Collections.Generic;
 using AIChat.Utils;
+using AIChat.Interop;
 
 namespace ChillAIMod
 {
     [BepInPlugin("com.username.chillaimod", "Chill AI Mod", AIChat.Version.VersionString)]
-    public class AIMod : BaseUnityPlugin
+    public class AIMod : BaseUnityPlugin, IAIChatPublicApi
     {
+        public static AIMod Instance { get; private set; }
+
+        public event Action<AIChatApiConversationResult> ConversationCompleted;
+
+        public string ApiVersion => "1.0.0";
+        public bool IsBusy => _isProcessing;
+        public bool IsReady => _isTTSServiceReady;
+
         // ================= 【配置项】 =================
         private ConfigEntry<bool> _useOllama;
         private ConfigEntry<ThinkMode> _thinkModeConfig;
@@ -167,6 +176,7 @@ Response format MUST be:
         private Vector2 _personaScrollPosition = Vector2.zero;
         void Awake()
         {
+            Instance = this;
             Log.Init(this.Logger);
             DontDestroyOnLoad(this.gameObject);
             this.gameObject.hideFlags = HideFlags.HideAndDontSave;
@@ -919,13 +929,37 @@ Response format MUST be:
             }
         }
 
-        IEnumerator AIProcessRoutine(string prompt)
+        IEnumerator AIProcessRoutine(string prompt, string inputSource = "ui")
         {
             _isProcessing = true;
+            var apiResult = new AIChatApiConversationResult
+            {
+                Success = false,
+                IsApiError = false,
+                ErrorMessage = string.Empty,
+                ErrorCode = 0,
+                InputSource = inputSource,
+                UserPrompt = prompt,
+                EmotionTag = "Think",
+                VoiceText = string.Empty,
+                SubtitleText = string.Empty,
+                RawResponse = string.Empty,
+                TtsAttempted = false,
+                TtsSucceeded = false,
+                TimestampUtc = DateTime.UtcNow
+            };
 
             // 1. 获取并处理 UI
             if (_cachedCanvas == null) _cachedCanvas = GameObject.Find("Canvas");
-            if (_cachedCanvas == null) { _isProcessing = false; yield break; }
+            if (_cachedCanvas == null) 
+            { 
+               apiResult.IsApiError = true;
+               apiResult.ErrorCode = -10;
+               apiResult.ErrorMessage = "Canvas not found.";
+               _isProcessing = false;
+               PublishConversationResult(apiResult);
+               yield break;
+            }
             // 静音模式下先临时恢复 StorySystemUI（否则 Find 找不到子对象）
             bool wasStoryUIHidden = false;
             if (_muteGameNativeAudio.Value && _storySystemUI != null && !_storySystemUI.activeSelf)
@@ -939,7 +973,15 @@ Response format MUST be:
                 _cachedOriginalTextTrans = _cachedCanvas.transform.Find("StorySystemUI/MessageWindow/NormalTextParent/NormalTextMessage");
             }
             Transform originalTextTrans = _cachedOriginalTextTrans;
-            if (originalTextTrans == null) { _isProcessing = false; yield break; }
+            if (originalTextTrans == null) 
+            { 
+                apiResult.IsApiError = true;
+                apiResult.ErrorCode = -11;
+                apiResult.ErrorMessage = "Story UI text target not found.";
+                _isProcessing = false;
+                PublishConversationResult(apiResult);
+                yield break; 
+            }
             GameObject originalTextObj = originalTextTrans.gameObject;
             GameObject parentObj = originalTextObj.transform.parent.gameObject;
             Dictionary<GameObject, bool> uiStatusMap = new Dictionary<GameObject, bool>();
@@ -947,7 +989,8 @@ Response format MUST be:
             originalTextObj.SetActive(false);
             GameObject myTextObj = UIHelper.CreateOverlayText(parentObj);
             Text myText = myTextObj.GetComponent<Text>();
-            myText.text = "Thinking..."; myText.color = Color.yellow;
+            myText.text = "Thinking...";
+            myText.color = Color.yellow;
 
             // 2. 准备请求数据
             var requestContext = new LLMRequestContext
@@ -997,6 +1040,11 @@ Response format MUST be:
                 if (errCode == 401) errMsg += "\n(请检查 API Key 是否正确)";
                 if (errCode == 404) errMsg += "\n(模型名称或 URL 错误)";
 
+                apiResult.IsApiError = true;
+                apiResult.ErrorCode = errCode;
+                apiResult.ErrorMessage = errMsg;
+                apiResult.RawResponse = string.Empty;
+
                 myText.text = errMsg;
                 myText.color = Color.red;
 
@@ -1008,6 +1056,7 @@ Response format MUST be:
                 // 静音模式下重新隐藏游戏 UI
                 if (wasStoryUIHidden && _storySystemUI != null) _storySystemUI.SetActive(false);
                 _isProcessing = false;
+                PublishConversationResult(apiResult);
                 yield break;
             }
 
@@ -1018,6 +1067,11 @@ Response format MUST be:
                 string emotionTag = parsedResponse.EmotionTag;
                 string voiceText = parsedResponse.VoiceText;
                 string subtitleText = parsedResponse.SubtitleText;
+                apiResult.Success = parsedResponse.Success;
+                apiResult.RawResponse = fullResponse;
+                apiResult.EmotionTag = emotionTag;
+                apiResult.VoiceText = voiceText;
+                apiResult.SubtitleText = subtitleText;
                 AddToMemorySystem("User", prompt);
                 AddToMemorySystem("AI", parsedResponse.Success ? $"[{emotionTag}] {voiceText}" : $"[格式错误] {fullResponse}");
 
@@ -1034,6 +1088,7 @@ Response format MUST be:
                 {
                     myText.text = "message is sending through cyber space";
                     AudioClip downloadedClip = null;
+                    apiResult.TtsAttempted = true;
                     // 【修改点 1: 移除 apiKey 参数，因为 TTS 是本地部署】
                     yield return StartCoroutine(TTSClient.DownloadVoiceWithRetry(
                         _sovitsUrlConfig.Value + "/tts",
@@ -1050,6 +1105,7 @@ Response format MUST be:
 
                     if (downloadedClip != null)
                     {
+                        apiResult.TtsSucceeded = true;
                         if (!downloadedClip.LoadAudioData()) yield return null;
                         yield return null;
 
@@ -1087,6 +1143,7 @@ Response format MUST be:
             // 静音模式下重新隐藏游戏 UI
             if (wasStoryUIHidden && _storySystemUI != null) _storySystemUI.SetActive(false);
             _isProcessing = false;
+            PublishConversationResult(apiResult);
         }
 
         IEnumerator TTSHealthCheckLoop()
@@ -1223,7 +1280,7 @@ Response format MUST be:
         /// <summary>
         /// ASR 业务流：负责调度网络请求和后续的 AI 响应
         /// </summary>
-        IEnumerator ASRWorkflow(byte[] wavData)
+        IEnumerator ASRWorkflow(byte[] wavData, string inputSource = "asr")
         {
             _isProcessing = true; // 锁定 UI
             string recognizedResult = "";
@@ -1241,16 +1298,33 @@ Response format MUST be:
                 Log.Info($"[Workflow] ASR 成功，开始进入 AI 思考流程: {recognizedResult}");
 
                 // 这里触发 AI 处理流程
-                yield return StartCoroutine(AIProcessRoutine(recognizedResult));
+                yield return StartCoroutine(AIProcessRoutine(recognizedResult, inputSource));
             }
             else
             {
                 Log.Warning("[Workflow] ASR 未能识别到有效文本");
                 _isProcessing = false; // 如果识别失败，在这里解锁 UI
+                PublishConversationResult(new AIChatApiConversationResult
+                {
+                    Success = false,
+                    IsApiError = true,
+                    ErrorCode = -3,
+                    ErrorMessage = "ASR returned empty text.",
+                    InputSource = inputSource,
+                    UserPrompt = string.Empty,
+                    EmotionTag = "Think",
+                    VoiceText = string.Empty,
+                    SubtitleText = string.Empty,
+                    RawResponse = string.Empty,
+                    TtsAttempted = false,
+                    TtsSucceeded = false,
+                    TimestampUtc = DateTime.UtcNow
+                });
             }
         }
         void OnApplicationQuit()
         {
+            Instance = null;
             Log.Info("[Chill AI Mod] 退出中...");
             
             // 【保存记忆系统】
@@ -1578,6 +1652,247 @@ Response format MUST be:
                 _muteCheckTimer = 0f;
                 DoMuteGameNative();
             }
+        private void PublishConversationResult(AIChatApiConversationResult result)
+        {
+            try
+            {
+                ConversationCompleted?.Invoke(result);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[PublicApi] ConversationCompleted 回调异常: {ex.Message}");
+            }
+        }
+
+        private Dictionary<string, ConfigEntryBase> GetConfigEntryMap()
+        {
+            return new Dictionary<string, ConfigEntryBase>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Use_Ollama_API"] = _useOllama,
+                ["ThinkMode"] = _thinkModeConfig,
+                ["API_URL"] = _chatApiUrlConfig,
+                ["API_Key"] = _apiKeyConfig,
+                ["ModelName"] = _modelConfig,
+                ["LogApiRequestBody"] = _logApiRequestBodyConfig,
+                ["FixApiPathForThinkMode"] = _fixApiPathForThinkModeConfig,
+                ["TTS_Service_URL"] = _sovitsUrlConfig,
+                ["TTS_Service_Script_Path"] = _TTSServicePathConfig,
+                ["LaunchTTSService"] = _LaunchTTSServiceConfig,
+                ["QuitTTSServiceOnQuit"] = _quitTTSServiceOnQuitConfig,
+                ["Audio_File_Path"] = _refAudioPathConfig,
+                ["Audio_File_Text"] = _promptTextConfig,
+                ["PromptLang"] = _promptLangConfig,
+                ["TargetLang"] = _targetLangConfig,
+                ["AudioPathCheck"] = _audioPathCheckConfig,
+                ["JapaneseCheck"] = _japaneseCheckConfig,
+                ["VoiceVolume"] = _voiceVolumeConfig,
+                ["SystemPrompt"] = _personaConfig,
+                ["ExperimentalMemory"] = _experimentalMemoryConfig,
+                ["ReverseEnterBehavior"] = _reverseEnterBehaviorConfig,
+                ["BackgroundOpacity"] = _backgroundOpacity,
+                ["ShowWindowTitle"] = _showWindowTitle,
+                ["WindowWidth"] = _windowWidthConfig,
+                ["WindowHeightBase"] = _windowHeightConfig
+            };
+        }
+
+        public Dictionary<string, string> GetAllConfigValues()
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in GetConfigEntryMap())
+            {
+                result[kv.Key] = kv.Value?.BoxedValue?.ToString() ?? string.Empty;
+            }
+            return result;
+        }
+
+        public Dictionary<string, string> GetAllConfigDefaultValues()
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in GetConfigEntryMap())
+            {
+                result[kv.Key] = kv.Value?.DefaultValue?.ToString() ?? string.Empty;
+            }
+            return result;
+        }
+
+        public string GetConfigValue(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            var map = GetAllConfigValues();
+            return map.TryGetValue(key, out var value) ? value : null;
+        }
+
+        public bool TrySetConfigValue(string key, string value, out string error)
+        {
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                error = "key is empty";
+                return false;
+            }
+
+            try
+            {
+                switch (key)
+                {
+                    case "Use_Ollama_API": _useOllama.Value = bool.Parse(value); break;
+                    case "ThinkMode": _thinkModeConfig.Value = (ThinkMode)Enum.Parse(typeof(ThinkMode), value, true); break;
+                    case "API_URL": _chatApiUrlConfig.Value = value ?? string.Empty; break;
+                    case "API_Key": _apiKeyConfig.Value = value ?? string.Empty; break;
+                    case "ModelName": _modelConfig.Value = value ?? string.Empty; break;
+                    case "LogApiRequestBody": _logApiRequestBodyConfig.Value = bool.Parse(value); break;
+                    case "FixApiPathForThinkMode": _fixApiPathForThinkModeConfig.Value = bool.Parse(value); break;
+                    case "TTS_Service_URL": _sovitsUrlConfig.Value = value ?? string.Empty; break;
+                    case "TTS_Service_Script_Path": _TTSServicePathConfig.Value = value ?? string.Empty; break;
+                    case "LaunchTTSService": _LaunchTTSServiceConfig.Value = bool.Parse(value); break;
+                    case "QuitTTSServiceOnQuit": _quitTTSServiceOnQuitConfig.Value = bool.Parse(value); break;
+                    case "Audio_File_Path": _refAudioPathConfig.Value = value ?? string.Empty; break;
+                    case "Audio_File_Text": _promptTextConfig.Value = value ?? string.Empty; break;
+                    case "PromptLang": _promptLangConfig.Value = value ?? string.Empty; break;
+                    case "TargetLang": _targetLangConfig.Value = value ?? string.Empty; break;
+                    case "AudioPathCheck": _audioPathCheckConfig.Value = bool.Parse(value); break;
+                    case "JapaneseCheck": _japaneseCheckConfig.Value = bool.Parse(value); break;
+                    case "VoiceVolume": _voiceVolumeConfig.Value = Mathf.Clamp(float.Parse(value), 0f, 1f); _audioSource.volume = _voiceVolumeConfig.Value; break;
+                    case "SystemPrompt": _personaConfig.Value = value ?? string.Empty; break;
+                    case "ExperimentalMemory": _experimentalMemoryConfig.Value = bool.Parse(value); break;
+                    case "ReverseEnterBehavior": _reverseEnterBehaviorConfig.Value = bool.Parse(value); break;
+                    case "BackgroundOpacity": _backgroundOpacity.Value = Mathf.Clamp(float.Parse(value), 0f, 1f); break;
+                    case "ShowWindowTitle": _showWindowTitle.Value = bool.Parse(value); break;
+                    case "WindowWidth": _windowWidthConfig.Value = Mathf.Max(300f, float.Parse(value)); break;
+                    case "WindowHeightBase": _windowHeightConfig.Value = Mathf.Max(100f, float.Parse(value)); break;
+                    default:
+                        error = $"unknown config key: {key}";
+                        return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        public bool TrySaveConfig(out string error)
+        {
+            error = string.Empty;
+            try
+            {
+                Config.Save();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        public bool SetConsoleVisible(bool visible, out string error)
+        {
+            error = string.Empty;
+            _showInputWindow = visible;
+            return true;
+        }
+
+        public bool GetConsoleVisible()
+        {
+            return _showInputWindow;
+        }
+
+        public bool TryClearMemory(out string error)
+        {
+            error = string.Empty;
+            try
+            {
+                _hierarchicalMemory?.ClearAllMemory();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        public bool TryStartTextConversation(string text, string inputSource, out string error)
+        {
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                error = "text is empty";
+                return false;
+            }
+
+            if (_isProcessing)
+            {
+                error = "AI is busy";
+                return false;
+            }
+
+            StartCoroutine(AIProcessRoutine(text, string.IsNullOrWhiteSpace(inputSource) ? "external-text" : inputSource));
+            return true;
+        }
+
+        public bool TryStartVoiceConversationFromWav(byte[] wavData, string inputSource, out string error)
+        {
+            error = string.Empty;
+            if (wavData == null || wavData.Length == 0)
+            {
+                error = "wav data is empty";
+                return false;
+            }
+
+            if (_isProcessing)
+            {
+                error = "AI is busy";
+                return false;
+            }
+
+            StartCoroutine(ASRWorkflow(
+                wavData,
+                string.IsNullOrWhiteSpace(inputSource) ? "external-asr" : inputSource));
+            return true;
+        }
+
+        public bool TryStartVoiceCapture(out string error)
+        {
+            error = string.Empty;
+            if (_isProcessing)
+            {
+                error = "AI is busy";
+                return false;
+            }
+
+            if (_isRecording)
+            {
+                error = "already recording";
+                return false;
+            }
+
+            if (Microphone.devices.Length == 0)
+            {
+                error = "no microphone found";
+                return false;
+            }
+
+            StartRecording();
+            return _isRecording;
+        }
+
+        public bool TryStopVoiceCaptureAndSend(string inputSource, out string error)
+        {
+            error = string.Empty;
+            if (!_isRecording)
+            {
+                error = "not recording";
+                return false;
+            }
+
+            StopRecordingAndRecognize();
+            return true;
         }
     }
 }
