@@ -1,0 +1,125 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <UnityDepsPath>$(MSBuildProjectDirectory)\..\build-resource\mokgamedir\\Chill With You_Data\Managed</UnityDepsPath>
+    <BepInExPath>$(MSBuildProjectDirectory)\..\build-resource\assets\BepInEx_win_x64\BepInEx\core</BepInExPath>
+  
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>AIChat</RootNamespace>
+    <AssemblyName>AIChat</AssemblyName>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ProjectGuid>{2E59843C-DE00-4628-A540-43F2449EA8B7}</ProjectGuid>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Console' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Console\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;CONSOLE_PROGRAME</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(Configuration)' == 'Console' ">
+    <Compile Remove="$(MSBuildProjectDirectory)\AIMod.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(Configuration)' != 'Console' ">
+    <Compile Remove="$(MSBuildProjectDirectory)\AIConsole.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ai_chat.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ai_chat.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExPath)\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExPath)\BepInEx.dll</HintPath>
+    </Reference>
+
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+
+    <Reference Include="UnityEngine">
+      <HintPath>$(UnityDepsPath)\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.AnimationModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(UnityDepsPath)\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(UnityDepsPath)\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(UnityDepsPath)\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.UIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+   <Reference Include="UnityEngine.ImageConversionModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <SpecificVersion>True</SpecificVersion>
+      <HintPath>$(UnityDepsPath)\UnityEngine.ImageConversionModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

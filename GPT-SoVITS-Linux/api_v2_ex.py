@@ -1,0 +1,1 @@
+../build-resource/assets/api_v2_ex.py

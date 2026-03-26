@@ -1,0 +1,101 @@
+name: Build for Preview Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ .github/workflows/build-preview.yml,AIChat/**,build-resource/** ]
+
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: ${{ !contains(github.event.head_commit.message, '[Release]') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout AIChat
+        uses: actions/checkout@v4
+
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: dotnet-sdk-8.0 python3 python3-pip zip pandoc
+
+      - name: Cache Unity assemblies
+        id: cache-unity
+        uses: actions/cache@v4
+        with:
+          path: build-resource/mokgamedir/Chill With You_Data/Managed
+          key: unity-assemblies-${{ hashFiles('build-resource/fetch.py') }}
+          restore-keys: |
+            unity-assemblies-
+      - name: Cache BepInEx
+        id: cache-bepinex
+        uses: actions/cache@v4
+        with:
+          path: build-resource/assets/BepInEx_win_x64
+          key: bepinex-${{ hashFiles('build-resource/fetch.py') }}
+          restore-keys: |
+            bepinex-
+
+      - name: Run fetch.py
+        if: steps.cache-unity.outputs.cache-hit != 'true' || steps.cache-bepinex.outputs.cache-hit != 'true'
+        run: python3 build-resource/fetch.py
+
+      - name: Get commit info for version
+        id: info
+        run: |
+          echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "time_local=$(TZ=Asia/Shanghai git log -1 --date=format-local:'%Y-%m-%d %H:%M:%S UTC+8' --format='%cd')" >> $GITHUB_OUTPUT
+          echo "time=$(TZ=UTC git log -1 --date=format-local:'%Y-%m-%d %H:%M:%S UTC' --format='%cd')" >> $GITHUB_OUTPUT
+          echo "version=$(TZ=UTC git log -1 --date=format-local:'0.%Y%m%d.%H%M%S' --format='%cd').$(git rev-parse --short=5 HEAD | perl -pe 's/([0-9a-f])/sprintf("%02d", hex($1))/ge')" >> $GITHUB_OUTPUT
+          # BepInEx 限定版本号格式，不符合格式要求则拒绝加载插件，所以这里将 HASH 值转为纯数字。
+          # HASH 16 进制值最多取 5 位，映射到 10 位十进制；因为 BepInEx 所支持的四段版本号采用 int32，每段上限为 2147483647，而从 16 进制按位映射到 10 位十进制，最大值 1515151515，不会超过上限。
+
+      - name: Inject version into Version.cs
+        run: |
+          sed -i 's/public const string VersionString = "0.0.0";/public const string VersionString = "${{ steps.info.outputs.version }}";/' AIChat/Version.cs
+          cat AIChat/Version.cs
+
+      - name: Build AIChat.dll
+        run: |
+          dotnet build -c Release
+          cp AIChat/bin/Release/net472/AIChat.dll build-resource/assets/
+
+      - name: Add README.html
+        run: build-resource/readme/build.sh
+
+      - name: Zip Artifact
+        run: |
+          cd build-resource/assets/
+          zip -r ../../AIChatMod.zip .
+
+      - name: Delete old preview release with tag
+        continue-on-error: true
+        run: gh release delete preview --cleanup-tag --yes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Preview Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview
+          name: "预览版"
+          body: |
+            [![Build Status](https://github.com/qzrs777/AIChat/actions/workflows/build-preview.yml/badge.svg)](https://github.com/qzrs777/AIChat/actions/workflows/build-preview.yml)
+            此为固定标签的预览版本，当有更新推送到特定路径时触发构建，也可由维护者手动触发构建。
+
+            此构建的 Commit 信息：
+            - HASH： ${{ steps.info.outputs.hash }}
+            - 本地时间：${{ steps.info.outputs.time_local }}
+            - 国际时间：${{ steps.info.outputs.time }}
+
+            临时版本号：${{ steps.info.outputs.version }}
+
+            > 临时版本号的格式为 `0.<UTC 年月日>.<UTC 时分秒>.<提交哈希前 5 位依次转 10 位数字>`
+          prerelease: true
+          files: AIChatMod.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

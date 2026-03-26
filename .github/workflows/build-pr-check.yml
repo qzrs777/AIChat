@@ -1,0 +1,57 @@
+name: Build for Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout AIChat
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: dotnet-sdk-8.0 python3 python3-pip zip pandoc
+
+      - name: Cache Unity assemblies
+        id: cache-unity
+        uses: actions/cache@v4
+        with:
+          path: build-resource/mokgamedir/Chill With You_Data/Managed
+          key: unity-assemblies-${{ hashFiles('build-resource/fetch.py') }}
+          restore-keys: |
+            unity-assemblies-
+      - name: Cache BepInEx
+        id: cache-bepinex
+        uses: actions/cache@v4
+        with:
+          path: build-resource/assets/BepInEx_win_x64
+          key: bepinex-${{ hashFiles('build-resource/fetch.py') }}
+          restore-keys: |
+            bepinex-
+
+      - name: Run fetch.py
+        if: steps.cache-unity.outputs.cache-hit != 'true' || steps.cache-bepinex.outputs.cache-hit != 'true'
+        run: python3 build-resource/fetch.py
+
+      - name: Build AIChat.dll
+        run: |
+          cd ${{ github.workspace }}
+          dotnet build -c Release
+          cp AIChat/bin/Release/net472/AIChat.dll build-resource/assets/
+
+      - name: Add README.html
+        run: build-resource/readme/build.sh
+
+      - name: Upload PR Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIChatMod-PR-${{ github.event.pull_request.number }}
+          path: build-resource/assets/
+          retention-days: 5

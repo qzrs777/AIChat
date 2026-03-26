@@ -1,0 +1,102 @@
+name: Build for Stable Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  check-message:
+    if: contains(github.event.head_commit.message, '[Release]')
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.regex.outputs.match }}
+    steps:
+      - id: regex
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          # 以 [Release] 开头，后面跟着数字.数字.数字
+          if [[ "$MSG" =~ \[Release\][0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "match=true" >> $GITHUB_OUTPUT
+          else
+            echo "match=false" >> $GITHUB_OUTPUT
+            echo "版本号在构建时将写入插件中，因 BepInEx 限制，版本号不能含字母，否则将无法加载。"
+          fi
+
+  build:
+    needs: check-message
+    if: needs.check-message.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout AIChat
+        uses: actions/checkout@v4
+
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: dotnet-sdk-8.0 python3 python3-pip zip pandoc
+
+      - name: Cache Unity assemblies
+        id: cache-unity
+        uses: actions/cache@v4
+        with:
+          path: build-resource/mokgamedir/Chill With You_Data/Managed
+          key: unity-assemblies-${{ hashFiles('build-resource/fetch.py') }}
+          restore-keys: |
+            unity-assemblies-
+      - name: Cache BepInEx
+        id: cache-bepinex
+        uses: actions/cache@v4
+        with:
+          path: build-resource/assets/BepInEx_win_x64
+          key: bepinex-${{ hashFiles('build-resource/fetch.py') }}
+          restore-keys: |
+            bepinex-
+
+      - name: Run fetch.py
+        if: steps.cache-unity.outputs.cache-hit != 'true' || steps.cache-bepinex.outputs.cache-hit != 'true'
+        run: python3 build-resource/fetch.py
+
+      - name: Get version info
+        id: info
+        run: |
+          FULL_MSG="${{ github.event.head_commit.message }}"
+          VERSION=$(echo "$FULL_MSG" | sed -n 's/.*\[Release\]\(.*\)/\1/p' | head -n 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Inject version into Version.cs
+        run: |
+          sed -i 's/public const string VersionString = "0.0.0";/public const string VersionString = "${{ steps.info.outputs.version }}";/' AIChat/Version.cs
+          cat AIChat/Version.cs
+
+      - name: Build AIChat.dll
+        run: |
+          dotnet build -c Release
+          cp AIChat/bin/Release/net472/AIChat.dll build-resource/assets/
+
+      - name: Add README.html
+        run: build-resource/readme/build.sh
+
+      - name: Zip Artifact
+        run: |
+          cd build-resource/assets/
+          zip -r ../../AIChatMod.zip .
+
+      - name: Delete old stable release with tag
+        continue-on-error: true
+        run: gh release delete ${{ steps.info.outputs.version }} --cleanup-tag --yes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Stable Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.version }}
+          name: "稳定版 ${{ steps.info.outputs.version }}"
+          body_path: release-note.md
+          files: AIChatMod.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
