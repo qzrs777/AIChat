@@ -84,6 +84,9 @@ namespace ChillAIMod
         private ConfigEntry<bool> _muteGameNativeAudio;
         private List<AudioSource> _mutedGameSources = new List<AudioSource>();
 
+        // --- 新增：添加聊天按钮配置 ---
+        private ConfigEntry<bool> _addChatButtonConfig;
+
         // 缓存游戏 UI 引用（避免 Find 在隐藏对象上失败）
         private Transform _cachedOriginalTextTrans = null;
         private GameObject _cachedCanvas = null;
@@ -232,6 +235,10 @@ Response format MUST be:
             _muteGameNativeAudio = Config.Bind("3. UI", "MuteGameNativeAudio", false,
                 "静音游戏原生角色语音和动作音效（防止与 AI 语音冲突）");
 
+            // --- 添加聊天按钮配置 ---
+            _addChatButtonConfig = Config.Bind("3. UI", "AddChatButton", false,
+                "在游戏UI中添加聊天按钮（开启后在屏幕右边显示）");
+
             // --- 人设配置 ---
             _useFinetunedModel = Config.Bind("4. Persona", "UseFinetunedModel", false,
                 "使用微调模型（satone-emotion，支持19种情感标签，开启后将自动设置对应的 System Prompt）");
@@ -322,7 +329,7 @@ Response format MUST be:
             }
 
             // 检查并添加AI聊天按钮
-            if (!_aiChatButtonAdded && Time.frameCount % 300 == 0) // 每5秒检查一次，避免频繁查找
+            if (_addChatButtonConfig.Value && !_aiChatButtonAdded && Time.frameCount % 300 == 0) // 每5秒检查一次，避免频繁查找
             {
                 AddAIChatButtonToRightIcons();
             }
@@ -688,6 +695,11 @@ Response format MUST be:
                     {
                         ApplyGameAudioMute(_muteGameNativeAudio.Value);
                     }
+                    GUILayout.Space(5);
+
+                    // 添加聊天按钮配置
+                    _addChatButtonConfig.Value = GUILayout.Toggle(_addChatButtonConfig.Value,
+                        "🎯 添加聊天按钮到游戏UI", GUILayout.Height(elementHeight));
                     GUILayout.Space(5);
 
                     // 背景透明配置
