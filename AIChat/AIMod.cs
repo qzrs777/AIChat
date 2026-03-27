@@ -144,8 +144,8 @@ Response format MUST be:
 [Sad] - Worried about the plot or fatigue.
 [Fun] - Sharing a joke or interesting idea.
 [Agree] - Nodding at the screen.
-[Drink] - Taking a sip of tea/coffee.
-[Wave] - Waving at the camera.
+[Relaxed] - Taking a sip of tea/coffee.
+[Greeting] - Waving at the camera.
 [Think] - Pondering about novel's plot.";
 
         // 微调模式人设（19标签，无需提示词）
@@ -169,8 +169,8 @@ Response format MUST be:
 [Sad] - Worried about the plot or fatigue.
 [Fun] - Sharing a joke or interesting idea.
 [Agree] - Nodding at the screen.
-[Drink] - Taking a sip of tea/coffee.
-[Wave] - Waving at the camera.
+[Relaxed] - Taking a sip of tea/coffee.
+[Greeting] - Waving at the camera.
 [Think] - Pondering about novel's plot.";
         private Vector2 _personaScrollPosition = Vector2.zero;
         void Awake()
