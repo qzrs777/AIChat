@@ -343,87 +343,235 @@
 | 11 | Base001_Motion11_Start_Lookdown | 低头看 |
 | 12 | Base001_Motion12_Start_Nod | 点头 |
 | 13 | Base001_Motion13_Start_ShakeHead | 摇头 |
-| 14 | Base001_Motion14_Start_LookPenguin | 看企鹅 |
-| 15 | Base001_Motion15_Start_Introduce | 介绍 |
+| 14 | Base001_Motion14_Start_LookPenguin | 看企鹅（好奇） |
+| 15 | Base001_Motion15_Start_Introduce | 介绍/引导 |
+| 16 | Base001_Motion16 | 未知动作16 |
+| 17 | Base001_Motion17 | 未知动作17 |
+| 18 | Base001_Motion18 | 未知动作18 |
 | 19 | Base001_Motion19_Copycat | 模仿 |
 | 20 | Base001_Motion20_Eieio | 调皮 |
-| 21 | Base001_Motion21_Distress | 苦恼 |
+| 21 | Base001_Motion21_Distress | 苦恼/不安 |
 
 #### 自由动作 (Wild001) ID: 50-73
 | ID | 名称 | 含义 |
 |----|------|------|
-| 50 | Wild001_StretchFllBody | 全身伸展 |
+| 50 | Wild001_StretchFullBody | 全身伸展 |
 | 51 | Wild001_StretchShoulder | 肩膀伸展 |
 | 52 | Wild001_Tea | 喝茶 |
-| 53 | Wild001_Guts | 握拳 |
-| 55 | Wild001_Banzai | 万岁 |
+| 53 | Wild001_Guts | 握拳/加油 |
+| 54 | Wild001_Wet | 淋湿 |
+| 55 | Wild001_Banzai | 万岁/举手欢呼 |
+| 56 | Wild001_Eieio | 调皮 |
 | 57 | Wild001_OpenWindow | 开窗 |
 | 58 | Wild001_CloseWindow | 关窗 |
+| 59 | Wild001_Breath | 深呼吸 |
 | 60 | Wild001_Guts_2 | 加油变体2 |
 | 61 | Wild001_Good | 竖拇指 |
 | 62 | Wild001_Fidget | 坐立不安 |
 | 63 | Wild001_Arm | 手臂动作 |
 | 64 | Wild001_Tired | 疲倦 |
 | 65 | Wild001_CompleteTask | 完成任务 |
+| 66 | Wild001_DeepBreath | 深呼吸 |
 | 67 | Wild001_Tired_2 | 疲倦变体2 |
-| 70 | Wild001_DryEye | 揉眼睛 |
+| 68 | Wild001_Gymnastics | 体操 |
+| 69 | Wild001_Stretch_2 | 伸展变体2 |
+| 70 | Wild001_DryEye | 揉眼睛/干眼 |
 | 71 | Wild001_Guts_3 | 加油变体3 |
 | 72 | Wild001_Yawn_1 | 打哈欠1 |
 | 73 | Wild001_Yawn_2 | 打哈欠2 |
 
-#### 工作 (WorkBase) ID: 200-305
+#### 场景切换 (Wild002) ID: 100-105
 | ID | 名称 | 含义 |
 |----|------|------|
-| 250 | WorkBase002 | 书桌默认 |
+| 100 | Wild002_FromPcToBook | 从电脑切到书 |
+| 101 | Wild002_FromReportToBook | 从报告切到书 |
+| 102 | Wild002_FromBookToPc | 从书切到电脑 |
+| 103 | Wild002_FromReportToPc | 从报告切到电脑 |
+| 104 | Wild002_FromBookToReport | 从书切到报告 |
+| 105 | Wild002_FromPcToReport | 从电脑切到报告 |
+
+#### 离开椅子/沙发 (Wild003) ID: 150-154
+| ID | 名称 | 含义 |
+|----|------|------|
+| 150 | Wild003_LeaveChair_Normal | 正常离开椅子 |
+| 151 | Wild003_LeaveChair_Sofa | 去沙发 |
+| 152 | Wild003_LeaveChair_Sofa_Thinking | 沙发上思考 |
+| 153 | Wild003_LeaveChair_Sofa_Look_Outside | 沙发上看窗外 |
+| 154 | Wild003_LeaveChair_Sofa_Control_Headphone | 沙发上戴耳机 |
+
+#### 工作-电脑 (WorkBase001) ID: 200-205
+| ID | 名称 | 含义 |
+|----|------|------|
+| 200 | WorkBase001 | 电脑工作默认 |
+| 201 | WorkBase001_Stop | 停止工作 |
+| 202 | WorkBase001_Thinking | 工作中思考 |
+| 203 | WorkBase001_DrinkTea | 工作中喝茶 |
+| 204 | WorkBase001_Break | 工作休息 |
+| 205 | WorkBase001_Break2 | 工作休息2 |
+
+#### 工作-书和电脑 (WorkBase002) ID: 250-256
+| ID | 名称 | 含义 |
+|----|------|------|
+| 250 | WorkBase002 | 书桌工作默认 |
 | 251 | WorkBase002_KeyType | 打字 |
 | 252 | WorkBase002_Thinking | 思考 |
 | 253 | WorkBase002_PageFlip | 翻页 |
+| 254 | WorkBase002_Loop2 | 循环动作2 |
 | 255 | WorkBase002_Loop2_PageFlip | 循环翻页 |
 | 256 | WorkBase002_DrinkTea | 喝茶 |
-| 202 | WorkBase001_Thinking | 工作思考 |
-| 301 | WorkBase003_SmallThinking | 小思考 |
-| 302 | WorkBase003_BigThinking | 大思考 |
 
-#### 休息 (BreakBase) ID: 600-854
+#### 工作-报告 (WorkBase003) ID: 300-305
 | ID | 名称 | 含义 |
 |----|------|------|
+| 300 | WorkBase003 | 报告工作默认 |
+| 301 | WorkBase003_SmallThinking | 小思考 |
+| 302 | WorkBase003_BigThinking | 大思考 |
+| 303 | WorkBase003_Loop2 | 循环动作2 |
+| 304 | WorkBase003_DrinkTea | 喝茶 |
+| 305 | WorkBase003_BrushAwayTrash | 扫桌子 |
+
+#### 游戏启动/点击 ID: 400-405
+| ID | 名称 | 含义 |
+|----|------|------|
+| 400 | GameStart_Start | 游戏启动开始 |
+| 401 | GameStart_End | 游戏启动结束 |
+| 402 | Desk_Click_Normal_Reaction | 点击普通反应 |
+| 403 | Desk_Click_Work_Reaction | 点击工作反应 |
+| 404 | Desk_Click_Rest_Reaction | 点击休息反应 |
+| 405 | Enable_Talk | 启用说话口型 |
+
+#### 休息-看电影 (BreakBase001) ID: 600-604
+| ID | 名称 | 含义 |
+|----|------|------|
+| 600 | BreakBase001 | 看电影默认 |
 | 601 | BreakBase001_Laugh | 大笑 |
 | 602 | BreakBase001_Suspenseful | 紧张悬疑 |
-| 653 | BreakBase002_Interest | 读到感兴趣 |
+| 603 | BreakBase001_OutTrash | 扔垃圾 |
+| 604 | BreakBase001_Loop2 | 循环动作2 |
+
+#### 休息-读书 (BreakBase002) ID: 650-653
+| ID | 名称 | 含义 |
+|----|------|------|
+| 650 | BreakBase002 | 读书默认 |
+| 651 | BreakBase002_NextPage | 翻到下一页 |
+| 652 | BreakBase002_PreviousPage | 翻到上一页 |
+| 653 | BreakBase002_Interest | 读到感兴趣的 |
+
+#### 休息-听音乐 (BreakBase003) ID: 700-701
+| ID | 名称 | 含义 |
+|----|------|------|
+| 700 | BreakBase003_ListenMusicLow | 听低音乐 |
+| 701 | BreakBase003_ListenMusicHigh | 听高音乐 |
+
+#### 休息-喝茶 (BreakBase004) ID: 750-755
+| ID | 名称 | 含义 |
+|----|------|------|
+| 750 | BreakBase004 | 喝茶默认 |
 | 751 | BreakBase004_DrinkTea | 喝茶 |
 | 752 | BreakBase004_Stretch | 伸懒腰 |
 | 753 | BreakBase004_DrinkHot | 喝热饮 |
+| 754 | BreakBase004_UseCoffeeMaker | 用咖啡机 |
 | 755 | BreakBase004_CoolingDrinkTea | 吹凉茶 |
+
+#### 休息-睡觉 (BreakBase005) ID: 800-804
+| ID | 名称 | 含义 |
+|----|------|------|
+| 800 | BreakBase005 | 睡觉默认 |
 | 801 | BreakBase005_Sleep | 睡着 |
 | 802 | BreakBase005_GetUpSlowly | 慢慢起床 |
 | 803 | BreakBase005_JumpUp | 突然跳起 |
+| 804 | BreakBase005_JumpUp_End | 跳起结束 |
+
+#### 休息-前倾 (BreakBase006) ID: 850-854
+| ID | 名称 | 含义 |
+|----|------|------|
+| 850 | BreakBase006 | 前倾默认 |
 | 851 | BreakBase006_Interest | 前倾感兴趣 |
 | 852 | BreakBase006_Keyboard | 打键盘 |
 | 853 | BreakBase006_PlayPenLoop | 玩笔 |
+| 854 | BreakBase006_DropPen | 扔笔 |
 
-#### 故事情感 (Story) ID: 1001-1407
+#### 故事情感1 (Story_SubBase001) ID: 1000-1004
 | ID | 名称 | 含义 |
 |----|------|------|
+| 1000 | Story_SubBase001 | 故事模式1默认 |
 | 1001 | Story_SubBase001_Joy | 开心 |
 | 1002 | Story_SubBase001_Sad | 难过 |
 | 1003 | Story_SubBase001_Fun | 有趣 |
-| 1004 | Story_SubBase001_Guts | 激动 |
+| 1004 | Story_SubBase001_Guts | 激动/加油 |
+
+#### 故事情感2 (Story_SubBase002) ID: 1100-1103
+| ID | 名称 | 含义 |
+|----|------|------|
+| 1100 | Story_SubBase002 | 故事模式2默认 |
 | 1101 | Story_SubBase002_Joy | 开心变体 |
 | 1102 | Story_SubBase002_Sad | 难过变体 |
 | 1103 | Story_SubBase002_Fun | 有趣变体 |
-| 1201 | Story_SubBase003_Sad | 难过变体3 |
-| 1202 | Story_SubBase003_Fun | 有趣变体3 |
-| 1301 | Story_SubBase004_Agree | 同意 |
-| 1302 | Story_SubBase004_Frustration | 困惑 |
-| 1401 | Story_SubBase005_LookDown | 低头 |
-| 1402 | Story_SubBase005_Nod | 点头 |
-| 1403 | Story_SubBase005_Denial | 否定 |
-| 1406 | Story_SubBase005_Climax_1 | 高潮 |
 
-#### 互动 ID: 5001-5002
+#### 故事情感3 (Story_SubBase003) ID: 1200-1202
 | ID | 名称 | 含义 |
 |----|------|------|
-| 5001 | WaveHandShortTime | 短挥手 |
-| 5002 | LeaningForward | 前倾 |
+| 1200 | Story_SubBase003 | 故事模式3默认 |
+| 1201 | Story_SubBase003_Sad | 难过变体3 |
+| 1202 | Story_SubBase003_Fun | 有趣变体3 |
+
+#### 故事情感4 (Story_SubBase004) ID: 1300-1302
+| ID | 名称 | 含义 |
+|----|------|------|
+| 1300 | Story_SubBase004 | 故事模式4默认 |
+| 1301 | Story_SubBase004_Agree | 同意 |
+| 1302 | Story_SubBase004_Frustration | 困惑/沮丧 |
+
+#### 故事情感5 (Story_SubBase005) ID: 1400-1407
+| ID | 名称 | 含义 |
+|----|------|------|
+| 1400 | Story_SubBase005 | 故事模式5默认 |
+| 1401 | Story_SubBase005_LookDown | 低头 |
+| 1402 | Story_SubBase005_Nod | 点头 |
+| 1403 | Story_SubBase005_Denial | 否定/拒绝 |
+| 1404 | Story_SubBase005_SpeakBlur | 模糊说话 |
+| 1405 | Story_SubBase005_StartClimax | 高潮开始 |
+| 1406 | Story_SubBase005_Climax_1 | 高潮1 |
+| 1407 | Story_SubBase005_Climax_2 | 高潮2 |
+
+#### 故事情感6 (Story_SubBase006) ID: 1500-1503
+| ID | 名称 | 含义 |
+|----|------|------|
+| 1500 | Story_SubBase006 | 故事模式6默认 |
+| 1501 | Story_SubBase006_001 | 动作1 |
+| 1502 | Story_SubBase006_002 | 动作2 |
+| 1503 | Story_SubBase006_003 | 动作3 |
+
+#### 故事情感7 (Story_SubBase007) ID: 1600-1603
+| ID | 名称 | 含义 |
+|----|------|------|
+| 1600 | Story_SubBase007 | 故事模式7默认 |
+| 1601 | Story_SubBase007_001 | 动作1 |
+| 1602 | Story_SubBase007_002 | 动作2 |
+| 1603 | Story_SubBase007_003 | 动作3 |
+
+#### 互动/挥手 ID: 5000-5002
+| ID | 名称 | 含义 |
+|----|------|------|
+| 5000 | WantTalk_Base_001 | 想说话默认 |
+| 5001 | WantTalk_WaveHandShortTime | 短挥手 |
+| 5002 | WantTalk_LeaningForward | 前倾 |
+
+#### 游戏开始/结束 ID: 6500-7000
+| ID | 名称 | 含义 |
+|----|------|------|
+| 6500 | GameStart_Base_001 | 游戏开始场景 |
+| 7000 | GameEnd_Base_001 | 游戏结束场景 |
+
+#### 节日活动 ID: 10000+
+| ID | 名称 | 含义 |
+|----|------|------|
+| 10000 | Event_Christmas_StartSitFromOutSide | 圣诞：从外面坐下 |
+| 10001 | Event_Christmas_Talk_001 | 圣诞：对话 |
+| 10100 | Event_NewYear_Countdown_001 | 新年倒计时1 |
+| 10101 | Event_NewYear_Countdown_002 | 新年倒计时2 |
+| 10102 | Event_NewYear_Countdown_003 | 新年倒计时3 |
+| 10103 | Event_NewYear_Countdown_004 | 新年倒计时4 |
 
 </details>
+
