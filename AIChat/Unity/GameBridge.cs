@@ -29,142 +29,125 @@ namespace AIChat.Unity
         public static readonly Dictionary<string, string[]> EmotionAnimations = new Dictionary<string, string[]>
         {
             ["Happy"] = new[] {
-                "id:1001",                          // Story_Joy
-                "Story_SubBase001_Joy",
-                "Story_SubBase002_Joy",
-                "Voice_Motion_Guts_001",
-                "Voice_Motion_Guts_002",
-                "Voice_Motion_Guts_003",
-                "Wild001_Guts_2",
-                "Shy_Joy",
+                "id:1001",   // Story_SubBase001_Joy
+                "id:1101",   // Story_SubBase002_Joy
+                "id:1004",   // Story_SubBase001_Guts
+                "id:7",      // Base001_Motion7_Confidence
+                "id:6",      // Base001_Motion6_Jump
             },
             ["Sad"] = new[] {
-                "id:1002",                          // Story_Sad
-                "Story_SubBase001_Sad",
-                "Story_SubBase002_Sad",
-                "Story_SubBase003_Sad",
-                "Base001_Motion4_Dropshoulders",
-                "Shy_Sad",
-                "Story_SubBase005_LookDown",
+                "id:1002",   // Story_SubBase001_Sad
+                "id:1102",   // Story_SubBase002_Sad
+                "id:1201",   // Story_SubBase003_Sad
+                "id:4",      // Base001_Motion4_Dropshoulders
+                "id:1401",   // Story_SubBase005_LookDown
             },
             ["Fun"] = new[] {
-                "id:1003",                          // Story_Fun
-                "Story_SubBase001_Fun",
-                "Story_SubBase002_Fun",
-                "Story_SubBase003_Fun",
-                "Voice_Motion_Laugh_001",
-                "Voice_Motion_Laugh_002",
-                "Voice_Motion_Laugh_003",
-                "Shy_Fun",
-                "BreakBase001_Laugh",
+                "id:1003",   // Story_SubBase001_Fun
+                "id:1103",   // Story_SubBase002_Fun
+                "id:1202",   // Story_SubBase003_Fun
+                "id:601",    // BreakBase001_Laugh
             },
             ["Think"] = new[] {
-                "id:252",                           // Thinking
-                "Base001_Motion8_Thinking",
-                "Base001_Motion9_Start_Thinking2",
-                "Base001_Motion10_Start_Thinking3",
-                "WorkBase001_Thinking",
-                "WorkBase002_Thinking",
-                "WorkBase003_BigThinking",
-                "WorkBase003_SmallThinking",
-                "Voice_Motion_Thinking_001",
-                "Voice_Motion_Thinking_002",
+                "id:252",    // WorkBase002_Thinking
+                "id:8",      // Base001_Motion8_Thinking
+                "id:9",      // Base001_Motion9_Start_Thinking2
+                "id:10",     // Base001_Motion10_Start_Thinking3
+                "id:202",    // WorkBase001_Thinking
+                "id:302",    // WorkBase003_BigThinking
+                "id:301",    // WorkBase003_SmallThinking
             },
             ["Agree"] = new[] {
-                "id:1301",                          // Story_Agree
-                "Story_SubBase004_Agree",
-                "Base001_Motion12_Start_Nod",
-                "Voice_Motion_Understand_001",
+                "id:1301",   // Story_SubBase004_Agree
+                "id:12",     // Base001_Motion12_Start_Nod
+                "id:1402",   // Story_SubBase005_Nod
             },
             ["Confused"] = new[] {
-                "id:1302",                          // Story_Frustration
-                "Story_SubBase004_Frustration",
-                "Base001_Motion1_FrustrationRight",
-                "Base001_Motion2_FrustrationLeft",
-                "Base001_Motion13_Start_ShakeHead",
-                "Voice_Motion_Question_001",
+                "id:1302",   // Story_SubBase004_Frustration
+                "id:1",      // Base001_Motion1_FrustrationRight
+                "id:2",      // Base001_Motion2_FrustrationLeft
+                "id:13",     // Base001_Motion13_Start_ShakeHead
             },
             ["Shy"] = new[] {
-                "Base001_Motion5_Shy",
-                "Shy_Joy",
-                "Shy_Rest",
-                "Shy_Surprise",
+                "id:5",      // Base001_Motion5_Shy
+                "id:3",      // Base001_Motion3_PressHands
+                "id:20",     // Base001_Motion20_Eieio
             },
             ["Angry"] = new[] {
-                "Shy_Anger",
-                "Story_SubBase005_Denial",
-                "Base001_Motion21_Distress",
+                "id:1403",   // Story_SubBase005_Denial
+                "id:21",     // Base001_Motion21_Distress
+                "id:1302",   // Story_SubBase004_Frustration
+                "id:13",     // Base001_Motion13_Start_ShakeHead
             },
             ["Surprise"] = new[] {
-                "Shy_Surprise",
-                "Voice_Motion_JumpUpStart_001",
-                "Voice_Motion_JumpUpEnd_001",
-                "Base001_Motion6_Jump",
+                "id:6",      // Base001_Motion6_Jump
+                "id:803",    // BreakBase005_JumpUp
+                "id:1003",   // Story_SubBase001_Fun
             },
             ["Tired"] = new[] {
-                "Wild001_Tired",
-                "Wild001_Tired_2",
-                "Wild001_Yawn_1",
-                "Wild001_Yawn_2",
-                "Wild001_DryEye",
+                "id:64",     // Wild001_Motion15_Tired
+                "id:67",     // Wild001_Motion18_Tired_2
+                "id:72",     // Wild001_Motion23_Yawn_1
+                "id:73",     // Wild001_Motion24_Yawn_2
+                "id:70",     // Wild001_Motion21_DryEye
             },
             ["Excited"] = new[] {
-                "Wild001_Banzai",
-                "Wild001_Guts",
-                "Wild001_Guts_3",
-                "Wild001_Good",
-                "Base001_Motion7_Confidence",
-                "Voice_Motion_Guts_004",
-                "Story_SubBase005_Climax_1",
-                "Story_SubBase001_Guts",
+                "id:55",     // Wild001_Motion6_Banzai
+                "id:53",     // Wild001_Motion4_Guts
+                "id:71",     // Wild001_Motion22_Guts_3
+                "id:61",     // Wild001_Motion12_Good
+                "id:7",      // Base001_Motion7_Confidence
+                "id:65",     // Wild001_Motion16_CompleteTask
+                "id:1406",   // Story_SubBase005_Climax_1
             },
             ["Relaxed"] = new[] {
-                "id:256",                           // DrinkTea
-                "BreakBase004_DrinkTea",
-                "BreakBase004_DrinkHot",
-                "BreakBase004_CoolingDrinkTea",
-                "BreakBase004_Stretch",
-                "Wild001_StretchShoulder",
-                "Wild001_Tea",
-                "Voice_Motion_DrinkHot_001",
-                "Voice_Motion_DrinkToCool_001",
+                "id:256",    // WorkBase002_DrinkTea
+                "id:751",    // BreakBase004_DrinkTea
+                "id:752",    // BreakBase004_Stretch
+                "id:753",    // BreakBase004_DrinkHot
+                "id:755",    // BreakBase004_CoolingDrinkTea
+                "id:50",     // Wild001_Motion1_StretchFllBody
+                "id:51",     // Wild001_Motion2_StretchShoulder
+                "id:52",     // Wild001_Motion3_Tea
             },
             ["Curious"] = new[] {
-                "BreakBase002_Interest",
-                "BreakBase006_Interest",
-                "Voice_Motion_Interest_001",
-                "Voice_Motion_Interest_002",
-                "Base001_Motion14_Start_LookPenguin",
+                "id:653",    // BreakBase002_Interest
+                "id:851",    // BreakBase006_Interest
+                "id:14",     // Base001_Motion14_Start_LookPenguin
             },
             ["Greeting"] = new[] {
-                "id:5001",                          // WaveHand
-                "Base001_Motion15_Start_Introduce",
+                "id:5001",   // WantTalk_Base_001_WaveHandShortTime
+                "id:15",     // Base001_Motion15_Start_Introduce
+                "id:5002",   // WantTalk_Base_001_LeaningForward
             },
             ["Working"] = new[] {
-                "BreakBase006_Keyboard",
-                "BreakBase006_PlayPenLoop",
-                "WorkBase002_KeyType",
-                "WorkBase002_Loop2_PageFlip",
+                "id:852",    // BreakBase006_Keyboard
+                "id:853",    // BreakBase006_PlayPenLoop
+                "id:251",    // WorkBase002_KeyType
+                "id:255",    // WorkBase002_Loop2_PageFlip
+                "id:253",    // WorkBase002_PageFlip
             },
             ["Sleepy"] = new[] {
-                "BreakBase005_Sleep",
-                "BreakBase005_GetUpSlowly",
-                "Wild001_Yawn_1",
-                "Wild001_Yawn_2",
+                "id:801",    // BreakBase005_Sleep
+                "id:802",    // BreakBase005_GetUpSlowly
+                "id:72",     // Wild001_Motion23_Yawn_1
+                "id:73",     // Wild001_Motion24_Yawn_2
             },
             ["Understand"] = new[] {
-                "Voice_Motion_Understand_001",
-                "Base001_Motion12_Start_Nod",
-                "id:1301",                          // Story_Agree
+                "id:1301",   // Story_SubBase004_Agree
+                "id:12",     // Base001_Motion12_Start_Nod
+                "id:1402",   // Story_SubBase005_Nod
             },
             ["Nervous"] = new[] {
-                "Wild001_Fidget",
-                "Base001_Motion21_Distress",
-                "BreakBase001_Suspenseful",
-                "Wild001_Arm",
+                "id:62",     // Wild001_Motion13_Fidget
+                "id:21",     // Base001_Motion21_Distress
+                "id:602",    // BreakBase001_Suspenseful
+                "id:63",     // Wild001_Motion14_Arm
+                "id:3",      // Base001_Motion3_PressHands
             },
             ["Idle"] = new[] {
-                "id:250",                           // Idle
+                "id:250",    // WorkBase002 默认
+                "id:0",      // Base001 默认
             },
         };
 
