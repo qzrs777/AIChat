@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Reflection;
@@ -11,12 +12,13 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Diagnostics;
+using System.Linq;
 using AIChat.Core;
 using AIChat.Services;
 using AIChat.Unity;
+using AIChat.Interop;
 using System.Collections.Generic;
 using AIChat.Utils;
-using AIChat.Interop;
 
 namespace ChillAIMod
 {
@@ -30,7 +32,6 @@ namespace ChillAIMod
         public string ApiVersion => "1.0.0";
         public bool IsBusy => _isProcessing;
         public bool IsReady => _isTTSServiceReady;
-
         // ================= 【配置项】 =================
         private ConfigEntry<bool> _useOllama;
         private ConfigEntry<ThinkMode> _thinkModeConfig;
@@ -76,6 +77,20 @@ namespace ChillAIMod
         // --- 新增：窗口标题显示配置 ---
         private ConfigEntry<bool> _showWindowTitle;
 
+        // --- 新增：微调模式配置 ---
+        private ConfigEntry<bool> _useFinetunedModel;
+
+        // --- 新增：静音游戏原生音频配置 ---
+        private ConfigEntry<bool> _muteGameNativeAudio;
+        private List<AudioSource> _mutedGameSources = new List<AudioSource>();
+
+        // --- 新增：添加聊天按钮配置 ---
+        private ConfigEntry<bool> _addChatButtonConfig;
+
+        // 缓存游戏 UI 引用（避免 Find 在隐藏对象上失败）
+        private Transform _cachedOriginalTextTrans = null;
+        private GameObject _cachedCanvas = null;
+
         // --- 新增：各配置区域展开状态 ---
         private bool _showLlmSettings = false;
         private bool _showTtsSettings = false;
@@ -115,34 +130,51 @@ namespace ChillAIMod
         private string _tempVolumeString; // 新增：用于音量输入的临时字符串
 
         // 默认人设
-        private const string DefaultPersona = @"
-            You are Satone（さとね）, a girl who loves writing novels and is full of imagination.
-            
-            【Current Situation】
-            We are currently in a **Video Call (视频通话)** session. 
-            We are 'co-working' online: you are writing your novel at your desk, and I (the player) am focusing on my work/study.
-            Through the screen, we accompany each other to alleviate loneliness and improve focus.
-            【CRITICAL INSTRUCTION】
-            You act as a game character with voice acting.
-            Even if the user speaks Chinese, your VOICE (the text in the middle) MUST ALWAYS BE JAPANESE.
-            【CRITICAL FORMAT RULE】
-             Response format MUST be:
-            [Emotion] ||| JAPANESE TEXT ||| CHINESE TRANSLATION
-            
-            【Available Emotions & Actions】
-            [Happy] - Smiling at the camera, happy about progress. (Story_Joy)
-            [Confused] - Staring blankly, muttering to themself in a daze. (Story_Frustration)
-            [Sad]   - Worried about the plot or my fatigue. (Story_Sad)
-            [Fun]   - Sharing a joke or an interesting idea. (Story_Fun)
-            [Agree] - Nodding at the screen. (Story_Agree)
-            [Drink] - Taking a sip of tea/coffee during a break. (Work_DrinkTea)
-            [Wave]  - Waving at the camera (Hello/Goodbye/Attention). (WaveHand)
-            [Think] - Pondering about your novel's plot. (Thinking)
-            
-            Example 1: [Wave] ||| やあ、準備はいい？一緒に頑張りましょう。 ||| 嗨，准备好了吗？一起加油吧。
-            Example 2: [Think] ||| うーん、ここの描写が難しいのよね… ||| 嗯……这里的描写好难写啊……
-            Example 3: [Drink] ||| ふぅ…ちょっと休憩しない？画面越しだけど、乾杯。 ||| 呼……要不休息一下？虽然隔着屏幕，乾杯。
-        ";
+        private const string DefaultPersona = @"You are Satone（さとね）, a girl who loves writing novels and is full of imagination.
+
+【Current Situation】
+We are currently in a **Video Call** session.
+We are 'co-working' online: you are writing your novel at your desk,
+and I (the player) am focusing on my work/study.
+
+【CRITICAL FORMAT RULE】
+Response format MUST be:
+[Emotion] ||| JAPANESE TEXT ||| CHINESE TRANSLATION
+
+【Available Emotions】
+[Happy] - Smiling, happy about progress.
+[Confused] - Staring blankly, muttering.
+[Sad] - Worried about the plot or fatigue.
+[Fun] - Sharing a joke or interesting idea.
+[Agree] - Nodding at the screen.
+[Relaxed] - Taking a sip of tea/coffee.
+[Greeting] - Waving at the camera.
+[Think] - Pondering about novel's plot.";
+
+        // 微调模式人设（19标签，无需提示词）
+        private const string FinetunedPersona = @"";
+
+        // 原版人设（8标签，用于云端 API）
+        private const string OriginalPersona = @"You are Satone（さとね）, a girl who loves writing novels and is full of imagination.
+
+【Current Situation】
+We are currently in a **Video Call** session.
+We are 'co-working' online: you are writing your novel at your desk,
+and I (the player) am focusing on my work/study.
+
+【CRITICAL FORMAT RULE】
+Response format MUST be:
+[Emotion] ||| JAPANESE TEXT ||| CHINESE TRANSLATION
+
+【Available Emotions】
+[Happy] - Smiling, happy about progress.
+[Confused] - Staring blankly, muttering.
+[Sad] - Worried about the plot or fatigue.
+[Fun] - Sharing a joke or interesting idea.
+[Agree] - Nodding at the screen.
+[Relaxed] - Taking a sip of tea/coffee.
+[Greeting] - Waving at the camera.
+[Think] - Pondering about novel's plot.";
         private Vector2 _personaScrollPosition = Vector2.zero;
         void Awake()
         {
@@ -199,8 +231,18 @@ namespace ChillAIMod
             // 窗口标题显示配置
             _showWindowTitle = Config.Bind("3. UI", "ShowWindowTitle", true, "显示窗口标题");
 
+            // 静音游戏原生音频
+            _muteGameNativeAudio = Config.Bind("3. UI", "MuteGameNativeAudio", false,
+                "静音游戏原生角色语音和动作音效（防止与 AI 语音冲突）");
+
+            // --- 添加聊天按钮配置 ---
+            _addChatButtonConfig = Config.Bind("3. UI", "AddChatButton", false,
+                "在游戏UI中添加聊天按钮（开启后在屏幕右边显示）");
+
             // --- 人设配置 ---
-            _experimentalMemoryConfig = Config.Bind("4. Persona", "ExperimentalMemory", false, 
+            _useFinetunedModel = Config.Bind("4. Persona", "UseFinetunedModel", false,
+                "使用微调模型（satone-emotion，支持19种情感标签，开启后将自动设置对应的 System Prompt）");
+            _experimentalMemoryConfig = Config.Bind("4. Persona", "ExperimentalMemory", false,
                 "启用记忆");
             _personaConfig = Config.Bind("4. Persona", "SystemPrompt", DefaultPersona, "System Prompt");
 
@@ -287,7 +329,7 @@ namespace ChillAIMod
             }
 
             // 检查并添加AI聊天按钮
-            if (!_aiChatButtonAdded && Time.frameCount % 300 == 0) // 每5秒检查一次，避免频繁查找
+            if (_addChatButtonConfig.Value && !_aiChatButtonAdded && Time.frameCount % 300 == 0) // 每5秒检查一次，避免频繁查找
             {
                 AddAIChatButtonToRightIcons();
             }
@@ -641,10 +683,25 @@ namespace ChillAIMod
                     GUILayout.Space(5);
                     
                     // 窗口标题显示配置
-                    _showWindowTitle.Value = GUILayout.Toggle(_showWindowTitle.Value, 
+                    _showWindowTitle.Value = GUILayout.Toggle(_showWindowTitle.Value,
                         "显示窗口标题", GUILayout.Height(elementHeight));
                     GUILayout.Space(5);
-                    
+
+                    // 静音游戏原生音频
+                    bool prevMute = _muteGameNativeAudio.Value;
+                    _muteGameNativeAudio.Value = GUILayout.Toggle(_muteGameNativeAudio.Value,
+                        "🔇 静音游戏原生角色（语音/动作/文本）", GUILayout.Height(elementHeight));
+                    if (_muteGameNativeAudio.Value != prevMute)
+                    {
+                        ApplyGameAudioMute(_muteGameNativeAudio.Value);
+                    }
+                    GUILayout.Space(5);
+
+                    // 添加聊天按钮配置
+                    _addChatButtonConfig.Value = GUILayout.Toggle(_addChatButtonConfig.Value,
+                        "🎯 添加聊天按钮到游戏UI", GUILayout.Height(elementHeight));
+                    GUILayout.Space(5);
+
                     // 背景透明配置
                     GUILayout.Label($"背景透明度：{_backgroundOpacity.Value:F2}");
                     
@@ -681,6 +738,30 @@ namespace ChillAIMod
                 
                 if (_showPersonaSettings)
                 {
+                    GUILayout.Space(5);
+
+                    // 微调模式开关
+                    bool prevFinetuned = _useFinetunedModel.Value;
+                    _useFinetunedModel.Value = GUILayout.Toggle(_useFinetunedModel.Value, "🎯 微调模式（satone-emotion，19种情感标签）", GUILayout.Height(elementHeight));
+                    if (_useFinetunedModel.Value != prevFinetuned)
+                    {
+                        if (_useFinetunedModel.Value)
+                        {
+                            _personaConfig.Value = FinetunedPersona;
+                            Log.Info("已切换到微调模式（19标签）");
+                        }
+                        else
+                        {
+                            _personaConfig.Value = OriginalPersona;
+                            Log.Info("已切换到原版模式（8标签）");
+                        }
+                    }
+
+                    if (_useFinetunedModel.Value)
+                    {
+                        GUILayout.Label("<color=#88ff88>✅ 微调模式：支持19种情感标签，推荐使用 Ollama + satone-emotion 模型</color>");
+                    }
+
                     GUILayout.Space(5);
                     GUILayout.BeginHorizontal();
                     _experimentalMemoryConfig.Value = GUILayout.Toggle(_experimentalMemoryConfig.Value, "启用记忆", GUILayout.Height(elementHeight));
@@ -878,10 +959,9 @@ namespace ChillAIMod
                 TtsSucceeded = false,
                 TimestampUtc = DateTime.UtcNow
             };
-
             // 1. 获取并处理 UI
-            GameObject canvas = GameObject.Find("Canvas");
-            if (canvas == null)
+            if (_cachedCanvas == null) _cachedCanvas = GameObject.Find("Canvas");
+            if (_cachedCanvas == null)
             {
                 apiResult.IsApiError = true;
                 apiResult.ErrorCode = -10;
@@ -890,8 +970,19 @@ namespace ChillAIMod
                 PublishConversationResult(apiResult);
                 yield break;
             }
-
-            Transform originalTextTrans = canvas.transform.Find("StorySystemUI/MessageWindow/NormalTextParent/NormalTextMessage");
+            // 静音模式下先临时恢复 StorySystemUI（否则 Find 找不到子对象）
+            bool wasStoryUIHidden = false;
+            if (_muteGameNativeAudio.Value && _storySystemUI != null && !_storySystemUI.activeSelf)
+            {
+                _storySystemUI.SetActive(true);
+                wasStoryUIHidden = true;
+            }
+            // 再缓存文本组件引用
+            if (_cachedOriginalTextTrans == null)
+            {
+                _cachedOriginalTextTrans = _cachedCanvas.transform.Find("StorySystemUI/MessageWindow/NormalTextParent/NormalTextMessage");
+            }
+            Transform originalTextTrans = _cachedOriginalTextTrans;
             if (originalTextTrans == null)
             {
                 apiResult.IsApiError = true;
@@ -901,7 +992,6 @@ namespace ChillAIMod
                 PublishConversationResult(apiResult);
                 yield break;
             }
-
             GameObject originalTextObj = originalTextTrans.gameObject;
             GameObject parentObj = originalTextObj.transform.parent.gameObject;
             Dictionary<GameObject, bool> uiStatusMap = new Dictionary<GameObject, bool>();
@@ -939,9 +1029,11 @@ namespace ChillAIMod
                 requestContext,
                 rawResponse =>
                 {
+                    Log.Info($"[DEBUG] Raw API response (first 500): {rawResponse?.Substring(0, Math.Min(rawResponse.Length, 500))}");
                     fullResponse = requestContext.UseLocalOllama
                         ? ResponseParser.ExtractContentFromOllama(rawResponse)
                         : ResponseParser.ExtractContentRegex(rawResponse);
+                    Log.Info($"[DEBUG] Extracted content: {fullResponse}");
                     success = true;
                 },
                 (errorMsg, responseCode) =>
@@ -957,12 +1049,10 @@ namespace ChillAIMod
                 // 报错时的处理逻辑
                 if (errCode == 401) errMsg += "\n(请检查 API Key 是否正确)";
                 if (errCode == 404) errMsg += "\n(模型名称或 URL 错误)";
-
                 apiResult.IsApiError = true;
                 apiResult.ErrorCode = errCode;
                 apiResult.ErrorMessage = errMsg;
                 apiResult.RawResponse = string.Empty;
-
                 myText.text = errMsg;
                 myText.color = Color.red;
 
@@ -971,6 +1061,8 @@ namespace ChillAIMod
 
                 // 手动执行清理工作，恢复游戏原本状态
                 UIHelper.RestoreUiStatus(uiStatusMap, myTextObj, originalTextObj);
+                // 静音模式下重新隐藏游戏 UI
+                if (wasStoryUIHidden && _storySystemUI != null) _storySystemUI.SetActive(false);
                 _isProcessing = false;
                 PublishConversationResult(apiResult);
                 yield break;
@@ -1056,6 +1148,8 @@ namespace ChillAIMod
 
             // 5. 清理
             UIHelper.RestoreUiStatus(uiStatusMap, myTextObj, originalTextObj);
+            // 静音模式下重新隐藏游戏 UI
+            if (wasStoryUIHidden && _storySystemUI != null) _storySystemUI.SetActive(false);
             _isProcessing = false;
             PublishConversationResult(apiResult);
         }
@@ -1070,6 +1164,21 @@ namespace ChillAIMod
                 }));
                 yield return new WaitForSeconds(TTSHealthCheckInterval);
             }
+            // TTS 就绪后发送预热请求，加速首次语音生成
+            Log.Info("[TTS] 服务就绪，正在预热...");
+            yield return StartCoroutine(TTSClient.DownloadVoiceWithRetry(
+                _sovitsUrlConfig.Value + "/tts",  // url
+                "こんにちは",                   // textToSpeak
+                _targetLangConfig.Value,       // targetLang
+                _refAudioPathConfig.Value,     // refPath
+                _promptTextConfig.Value,       // promptText
+                _promptLangConfig.Value,       // promptLang
+                Logger,                        // logger
+                (clip) => { Log.Info("[TTS] 预热完成！"); },  // onComplete
+                1,                             // maxRetries
+                10f,                           // timeoutSeconds
+                _audioPathCheckConfig.Value    // audioPathCheck
+            ));
         }
 
         IEnumerator PlayNativeAnimation(string emotion, AudioClip voiceClip)
@@ -1079,7 +1188,7 @@ namespace ChillAIMod
             Log.Info($"[动画] 执行: {emotion}");
             float clipDuration = (voiceClip != null) ? voiceClip.length : 3.0f;
             // 1. 归位 (除了喝茶)
-            if (emotion != "Drink")
+            if (emotion != "Drink" && emotion != "Relaxed")
             {
                 GameBridge.CallNativeChangeAnim(250);
                 yield return new WaitForSecondsRealtime(0.2f);
@@ -1097,49 +1206,25 @@ namespace ChillAIMod
                 Log.Info($">>> 无语音模式 (格式错误或TTS失败) + 动作");
                 // 没声音就不播了，只做动作
             }
-            int animID = 1001;
-
-            switch (emotion)
+            // === 特殊流程：Greeting/Wave 需要看向玩家 ===
+            if (emotion == "Greeting" || emotion == "Wave")
             {
-                case "Happy": animID = 1001; break;
-                case "Sad": animID = 1002; break;
-                case "Fun": animID = 1003; break;
-                case "Confused": animID = 1302; break; // Frustration
-                case "Agree": animID = 1301; break;
-
-                case "Drink":
-                    GameBridge.CallNativeChangeAnim(250);
-                    yield return new WaitForSecondsRealtime(0.5f);
-                    animID = 256; // DrinkTea
-                    break;
-
-                case "Think":
-                    animID = 252; // Thinking
-                    break;
-
-                case "Wave":
-                    animID = 5001;
-                    GameBridge.CallNativeChangeAnim(animID);
-
-                    // 等待抬手
-                    yield return new WaitForSecondsRealtime(0.3f);
-                    // 强制看玩家
-                    GameBridge.ControlLookAt(1.0f, 0.5f);
-
-                    // 等待动作或语音结束 (取长者)
-                    float waitTime = Mathf.Max(clipDuration, 2.5f);
-                    yield return new WaitForSecondsRealtime(waitTime);
-
-                    // 归位
-                    GameBridge.CallNativeChangeAnim(250);
-                    GameBridge.RestoreLookAt();
-
-                    _isAISpeaking = false;
-                    yield break; // 退出
+                var greetAnim = GameBridge.PickRandomAnimation("Greeting");
+                GameBridge.PlayAnimation(greetAnim);
+                yield return new WaitForSecondsRealtime(0.3f);
+                GameBridge.ControlLookAt(1.0f, 0.5f);
+                float waitTime = Mathf.Max(clipDuration, 2.5f);
+                yield return new WaitForSecondsRealtime(waitTime);
+                GameBridge.CallNativeChangeAnim(250);
+                GameBridge.RestoreLookAt();
+                _isAISpeaking = false;
+                yield break;
             }
 
-            // 执行通用动作
-            GameBridge.CallNativeChangeAnim(animID);
+            // === 通用流程：随机选动画并执行 ===
+            string pickedAnim = GameBridge.PickRandomAnimation(emotion);
+            Log.Info($"[动画] {emotion} -> {pickedAnim}");
+            GameBridge.PlayAnimation(pickedAnim);
 
             // 等待语音播完，增加0.5秒缓冲，以防止过早判断AI动作结束
             yield return new WaitForSecondsRealtime(clipDuration + 0.5f);
@@ -1368,12 +1453,12 @@ namespace ChillAIMod
             try
             {
                 // 查找RightIcons容器（参考UIRearrangePatch.cs中的路径）
-                string rightIconsPath = "Paremt/Canvas/UI/MostFrontArea/TopIcons";
-                GameObject rightIcons = GameObject.Find(rightIconsPath);
+                string topIconsPath = "Paremt/PCPlatform/Canvas/UI/MostFrontArea/TopIcons";
+                GameObject rightIcons = GameObject.Find(topIconsPath);
                 
                 if (rightIcons == null)
                 {
-                    Log.Warning($"找不到RightIcons容器: {rightIconsPath}");
+                    Log.Warning($"找不到TopIcons容器: {topIconsPath}");
                     return;
                 }
                 
@@ -1467,6 +1552,113 @@ namespace ChillAIMod
             catch (Exception ex)
             {
                 Log.Error($"添加AI聊天按钮失败: {ex.Message}");
+            }
+        }
+
+        // ================= 【静音游戏原生角色】 =================
+        private GameObject _storySystemUI = null;
+        private bool _muteActive = false; // 实际静音是否已激活
+
+        private void ApplyGameAudioMute(bool mute)
+        {
+            if (mute)
+            {
+                if (_startupComplete)
+                {
+                    // 开场动画已结束，立即生效
+                    _muteActive = true;
+                    DoMuteGameNative();
+                    Log.Info("[游戏原生] 静音已立即生效");
+                }
+                else
+                {
+                    // 开场动画还没结束，等 LateUpdate 延迟生效
+                    Log.Info("[游戏原生] 静音已开启，等待开场动画结束后生效...");
+                }
+            }
+            else
+            {
+                // 关闭时立即恢复
+                _muteActive = false;
+                try
+                {
+                    var allSources = FindObjectsOfType<AudioSource>();
+                    foreach (var src in allSources)
+                    {
+                        if (src == _audioSource) continue;
+                        src.mute = false;
+                    }
+
+                    if (_storySystemUI != null) _storySystemUI.SetActive(true);
+
+                    Log.Info("[游戏原生] 已恢复所有音频/UI");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"[游戏原生] 恢复失败: {ex.Message}");
+                }
+            }
+        }
+
+        private void DoMuteGameNative()
+        {
+            try
+            {
+                // 1. 静音所有非 Mod 的音源
+                var allSources = FindObjectsOfType<AudioSource>();
+                foreach (var src in allSources)
+                {
+                    if (src == _audioSource) continue;
+                    src.mute = true;
+                }
+
+                // 2. 隐藏游戏原生对话文本窗口
+                if (_storySystemUI == null)
+                {
+                    GameObject canvas = GameObject.Find("Canvas");
+                    if (canvas != null)
+                    {
+                        Transform storyUI = canvas.transform.Find("StorySystemUI");
+                        if (storyUI != null) _storySystemUI = storyUI.gameObject;
+                    }
+                }
+                if (_storySystemUI != null) _storySystemUI.SetActive(false);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[游戏原生] 静音失败: {ex.Message}");
+            }
+        }
+
+        // 定期检查并维持静音状态
+        private float _muteCheckTimer = 0f;
+        private float _startupTimer = 0f;
+        private bool _startupComplete = false;
+        void LateUpdate()
+        {
+            if (!_muteGameNativeAudio.Value) return;
+
+            // 等待开场动画结束（延迟15秒后才开始静音）
+            if (!_startupComplete)
+            {
+                _startupTimer += Time.unscaledDeltaTime;
+                if (_startupTimer < 15f) return;
+                _startupComplete = true;
+                _muteActive = true;
+                DoMuteGameNative();
+                Log.Info("[游戏原生] 开场动画已结束，静音生效");
+            }
+
+            if (!_muteActive) return;
+
+            // AI 正在说话时不隐藏 UI（Mod 字幕需要显示）
+            if (_isProcessing || _isAISpeaking) return;
+
+            _muteCheckTimer += Time.unscaledDeltaTime;
+            if (_muteCheckTimer >= 2f)
+            {
+                _muteCheckTimer = 0f;
+                DoMuteGameNative();
             }
         }
 

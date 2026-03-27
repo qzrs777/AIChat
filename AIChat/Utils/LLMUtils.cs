@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
 using ChillAIMod;
@@ -84,18 +85,58 @@ namespace AIChat.Utils
                 parts = response.Split(new string[] { "|" }, StringSplitOptions.None);
             }
 
-            // 【核心修改：严格的格式检查】
+            // 【核心修改：严格的格式检查 + 正则容错】
             if (parts.Length >= 3)
             {
-                // 格式正确：[动作] ||| 日语 ||| 中文
-                ret.EmotionTag = parts[0].Trim().Replace("[", "").Replace("]", "");
+                // 用正则提取标签名，容错处理多余括号等情况
+                var tagMatch = Regex.Match(parts[0], @"\[(\w+)\]");
+                if (tagMatch.Success)
+                {
+                    ret.EmotionTag = tagMatch.Groups[1].Value;
+                }
+                else
+                {
+                    // fallback：去掉所有非字母字符
+                    ret.EmotionTag = Regex.Replace(parts[0].Trim(), @"[^\w]", "");
+                    if (string.IsNullOrEmpty(ret.EmotionTag)) ret.EmotionTag = "Idle";
+                }
                 ret.VoiceText = parts[1].Trim();
                 ret.SubtitleText = parts[2].Trim();
 
                 ret.Success = true;
             }
 
-            if (!ret.Success) Log.Warning($"[格式错误] AI 回复不符合格式: {response}");
+            // 兜底：格式不完整时尝试智能解析
+            if (!ret.Success)
+            {
+                // 情况1: [Tag] 日文 ||| 中文（只有一个 |||）
+                var twoPartMatch = Regex.Match(response, @"\[(\w+)\]\s*(.+?)\s*\|\|\|\s*(.+)");
+                if (twoPartMatch.Success)
+                {
+                    ret.EmotionTag = twoPartMatch.Groups[1].Value;
+                    ret.VoiceText = twoPartMatch.Groups[2].Value.Trim();
+                    ret.SubtitleText = twoPartMatch.Groups[3].Value.Trim();
+                    ret.Success = true;
+                    Log.Warning($"[格式兜底-两段] [{ret.EmotionTag}] voice={ret.VoiceText} sub={ret.SubtitleText}");
+                }
+                // 情况2: [Tag] 纯内容（没有 |||）
+                else
+                {
+                    var fallbackMatch = Regex.Match(response, @"\[(\w+)\]\s*(.+)");
+                    if (fallbackMatch.Success)
+                    {
+                        ret.EmotionTag = fallbackMatch.Groups[1].Value;
+                        ret.VoiceText = fallbackMatch.Groups[2].Value.Trim();
+                        ret.SubtitleText = ret.VoiceText;
+                        ret.Success = true;
+                        Log.Warning($"[格式兜底-单段] [{ret.EmotionTag}] {ret.VoiceText}");
+                    }
+                    else
+                    {
+                        Log.Warning($"[格式错误] AI 回复不符合格式: {response}");
+                    }
+                }
+            }
 
             return ret;
         }

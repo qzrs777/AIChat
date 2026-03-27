@@ -209,6 +209,7 @@
 - 未安装 AIChat 时应直接降级，不抛异常。
 - 本仓库中的 ChillPatcher 已提供参考桥接实现：`Chill/Integration/AIChatBridge.cs`。
 
+
 ## 构建
 本 Mod 的核心 `AIChat.dll` 可从仓库构建。
 
@@ -285,3 +286,144 @@
 本项目是 MIT 许可的自由开源软件。详见 [LICENSE](https://github.com/qzrs777/AIChat/blob/main/LICENSE)。
 
 本项目与游戏官方无关；此游戏也有其他 Mod，可参见：[awesome-chillwithyou](https://github.com/clsty/awesome-chillwithyou)。
+
+---
+
+## さとね微调模型 (satone-emotion)
+
+基于 Qwen3.5-4B 微调，支持 19 种情感标签 + 78 个动画随机映射。
+
+### 模型下载
+- **百度云**: https://pan.baidu.com/s/1-NxgcHmkTVz8PnwxpxogxA?pwd=2gss
+- **GitHub Release**: https://github.com/JinCao-0721/AIChat/releases/tag/v1.0.0-satone
+
+### 19 情感标签 → 动画 ID 映射表
+
+| 标签 | 含义 | 动画 ID（随机选一个） |
+|------|------|----------------------|
+| Happy | 开心 | 1001 (Joy), 1101 (Joy变体), 1004 (Guts), 7 (自信), 6 (跳跃) |
+| Sad | 难过 | 1002 (Sad), 1102 (Sad变体), 1201 (Sad变体3), 4 (垂肩), 1401 (低头) |
+| Fun | 搞笑 | 1003 (Fun), 1103 (Fun变体), 1202 (Fun变体3), 601 (大笑) |
+| Think | 思考 | 252 (思考), 8 (思考), 9 (思考2), 10 (思考3), 202 (工作思考), 302 (大思考), 301 (小思考) |
+| Agree | 同意 | 1301 (同意), 12 (点头), 1402 (点头变体) |
+| Confused | 困惑 | 1302 (困惑), 1 (沮丧右), 2 (沮丧左), 13 (摇头) |
+| Shy | 害羞 | 5 (害羞), 3 (双手紧握), 20 (调皮) |
+| Angry | 生气/拒绝 | 1403 (否定), 21 (苦恼), 1302 (困惑), 13 (摇头) |
+| Surprise | 惊讶 | 6 (跳跃), 803 (突然跳起), 1003 (Fun) |
+| Tired | 疲倦 | 64 (疲倦), 67 (疲倦2), 72 (哈欠1), 73 (哈欠2), 70 (揉眼) |
+| Excited | 兴奋 | 55 (万岁), 53 (握拳), 71 (加油3), 61 (竖拇指), 7 (自信), 65 (完成任务), 1406 (高潮) |
+| Relaxed | 放松 | 256 (喝茶), 751 (喝茶), 752 (伸懒腰), 753 (喝热饮), 755 (吹凉茶), 50 (全身伸展), 51 (肩膀伸展), 52 (喝茶) |
+| Curious | 好奇 | 653 (读到感兴趣), 851 (前倾感兴趣), 14 (看企鹅) |
+| Greeting | 打招呼 | 5001 (短挥手), 15 (介绍), 5002 (前倾) |
+| Working | 工作中 | 852 (打键盘), 853 (玩笔), 251 (打字), 255 (循环翻页), 253 (翻页) |
+| Sleepy | 困了 | 801 (睡着), 802 (慢慢起床), 72 (哈欠1), 73 (哈欠2) |
+| Understand | 理解 | 1301 (同意), 12 (点头), 1402 (点头变体) |
+| Nervous | 紧张 | 62 (坐立不安), 21 (苦恼), 602 (紧张悬疑), 63 (手臂动作), 3 (双手紧握) |
+| Idle | 默认 | 250 (书桌默认), 0 (待机默认) |
+
+### 完整 AnimationType 枚举 (118个)
+
+<details>
+<summary>点击展开完整列表</summary>
+
+#### 基础动作 (Base001) ID: 0-21
+| ID | 名称 | 含义 |
+|----|------|------|
+| 0 | Base001 | 默认待机 |
+| 1 | Base001_Motion1_FrustrationRight | 沮丧（向右） |
+| 2 | Base001_Motion2_FrustrationLeft | 沮丧（向左） |
+| 3 | Base001_Motion3_PressHands | 双手按压 |
+| 4 | Base001_Motion4_Dropshoulders | 垂肩（失落） |
+| 5 | Base001_Motion5_Shy | 害羞 |
+| 6 | Base001_Motion6_Jump | 跳跃 |
+| 7 | Base001_Motion7_Confidence | 自信 |
+| 8 | Base001_Motion8_Thinking | 思考 |
+| 9 | Base001_Motion9_Start_Thinking2 | 思考变体2 |
+| 10 | Base001_Motion10_Start_Thinking3 | 思考变体3 |
+| 11 | Base001_Motion11_Start_Lookdown | 低头看 |
+| 12 | Base001_Motion12_Start_Nod | 点头 |
+| 13 | Base001_Motion13_Start_ShakeHead | 摇头 |
+| 14 | Base001_Motion14_Start_LookPenguin | 看企鹅 |
+| 15 | Base001_Motion15_Start_Introduce | 介绍 |
+| 19 | Base001_Motion19_Copycat | 模仿 |
+| 20 | Base001_Motion20_Eieio | 调皮 |
+| 21 | Base001_Motion21_Distress | 苦恼 |
+
+#### 自由动作 (Wild001) ID: 50-73
+| ID | 名称 | 含义 |
+|----|------|------|
+| 50 | Wild001_StretchFllBody | 全身伸展 |
+| 51 | Wild001_StretchShoulder | 肩膀伸展 |
+| 52 | Wild001_Tea | 喝茶 |
+| 53 | Wild001_Guts | 握拳 |
+| 55 | Wild001_Banzai | 万岁 |
+| 57 | Wild001_OpenWindow | 开窗 |
+| 58 | Wild001_CloseWindow | 关窗 |
+| 60 | Wild001_Guts_2 | 加油变体2 |
+| 61 | Wild001_Good | 竖拇指 |
+| 62 | Wild001_Fidget | 坐立不安 |
+| 63 | Wild001_Arm | 手臂动作 |
+| 64 | Wild001_Tired | 疲倦 |
+| 65 | Wild001_CompleteTask | 完成任务 |
+| 67 | Wild001_Tired_2 | 疲倦变体2 |
+| 70 | Wild001_DryEye | 揉眼睛 |
+| 71 | Wild001_Guts_3 | 加油变体3 |
+| 72 | Wild001_Yawn_1 | 打哈欠1 |
+| 73 | Wild001_Yawn_2 | 打哈欠2 |
+
+#### 工作 (WorkBase) ID: 200-305
+| ID | 名称 | 含义 |
+|----|------|------|
+| 250 | WorkBase002 | 书桌默认 |
+| 251 | WorkBase002_KeyType | 打字 |
+| 252 | WorkBase002_Thinking | 思考 |
+| 253 | WorkBase002_PageFlip | 翻页 |
+| 255 | WorkBase002_Loop2_PageFlip | 循环翻页 |
+| 256 | WorkBase002_DrinkTea | 喝茶 |
+| 202 | WorkBase001_Thinking | 工作思考 |
+| 301 | WorkBase003_SmallThinking | 小思考 |
+| 302 | WorkBase003_BigThinking | 大思考 |
+
+#### 休息 (BreakBase) ID: 600-854
+| ID | 名称 | 含义 |
+|----|------|------|
+| 601 | BreakBase001_Laugh | 大笑 |
+| 602 | BreakBase001_Suspenseful | 紧张悬疑 |
+| 653 | BreakBase002_Interest | 读到感兴趣 |
+| 751 | BreakBase004_DrinkTea | 喝茶 |
+| 752 | BreakBase004_Stretch | 伸懒腰 |
+| 753 | BreakBase004_DrinkHot | 喝热饮 |
+| 755 | BreakBase004_CoolingDrinkTea | 吹凉茶 |
+| 801 | BreakBase005_Sleep | 睡着 |
+| 802 | BreakBase005_GetUpSlowly | 慢慢起床 |
+| 803 | BreakBase005_JumpUp | 突然跳起 |
+| 851 | BreakBase006_Interest | 前倾感兴趣 |
+| 852 | BreakBase006_Keyboard | 打键盘 |
+| 853 | BreakBase006_PlayPenLoop | 玩笔 |
+
+#### 故事情感 (Story) ID: 1001-1407
+| ID | 名称 | 含义 |
+|----|------|------|
+| 1001 | Story_SubBase001_Joy | 开心 |
+| 1002 | Story_SubBase001_Sad | 难过 |
+| 1003 | Story_SubBase001_Fun | 有趣 |
+| 1004 | Story_SubBase001_Guts | 激动 |
+| 1101 | Story_SubBase002_Joy | 开心变体 |
+| 1102 | Story_SubBase002_Sad | 难过变体 |
+| 1103 | Story_SubBase002_Fun | 有趣变体 |
+| 1201 | Story_SubBase003_Sad | 难过变体3 |
+| 1202 | Story_SubBase003_Fun | 有趣变体3 |
+| 1301 | Story_SubBase004_Agree | 同意 |
+| 1302 | Story_SubBase004_Frustration | 困惑 |
+| 1401 | Story_SubBase005_LookDown | 低头 |
+| 1402 | Story_SubBase005_Nod | 点头 |
+| 1403 | Story_SubBase005_Denial | 否定 |
+| 1406 | Story_SubBase005_Climax_1 | 高潮 |
+
+#### 互动 ID: 5001-5002
+| ID | 名称 | 含义 |
+|----|------|------|
+| 5001 | WaveHandShortTime | 短挥手 |
+| 5002 | LeaningForward | 前倾 |
+
+</details>

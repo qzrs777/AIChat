@@ -94,7 +94,7 @@ namespace ChillAIMod
         public string GetContext()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("【Conversation History】");
+            sb.AppendLine("【对话记忆（仅供参考，回复时必须使用 [标签] ||| 日文 ||| 中文 格式）】");
 
             for (int i = _layers.Count - 1; i >= 0; i--)
             {
@@ -171,12 +171,12 @@ namespace ChillAIMod
 
         private async Task<string> CallLlmToSummarizeAsync(List<string> items, int layerIndex)
         {
-            // 根据层级调整prompt策略：Layer0保留细节，Layer1+高度浓缩
+            // 根据层级调整prompt策略：使用中文避免干扰微调模型格式
             string strategyHint = layerIndex == 0
-                ? "Summarize into ONE LINE. Keep key info (names, events). No explanation."
-                : "Compress into ONE LINE (max 50 words). Extract critical theme only.";
+                ? "请用一句中文总结以下对话要点，保留关键信息（人名、事件、情绪）。只输出纯文本总结，不要使用任何标签或特殊格式。"
+                : "请用一句中文（不超过50字）概括核心主题。只输出纯文本，不要使用任何标签或特殊格式。";
 
-            string prompt = $"{strategyHint}\n\nContent:\n{string.Join("\n", items.Select((item, idx) => $"{idx + 1}. {item}"))}\n\nSummary:";
+            string prompt = $"{strategyHint}\n\n内容:\n{string.Join("\n", items.Select((item, idx) => $"{idx + 1}. {item}"))}\n\n总结:";
 
             try
             {
