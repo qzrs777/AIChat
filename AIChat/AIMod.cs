@@ -92,6 +92,7 @@ namespace ChillAIMod
         private ConfigEntry<float> _vadThresholdConfig;
         private ConfigEntry<float> _vadMinSpeechConfig;
         private ConfigEntry<float> _vadSilenceConfig;
+        private ConfigEntry<float> _vadEndThresholdRatioConfig;
         private ConfigEntry<bool> _voiceCallBargeInConfig;
         private ConfigEntry<float> _voiceCallResumeDelayConfig;
 
@@ -269,8 +270,10 @@ Response format MUST be:
                 "语音检测能量阈值（越小越灵敏，建议 0.002 ~ 0.01）");
             _vadMinSpeechConfig = Config.Bind("5. VoiceCall", "Vad_MinSpeechSeconds", 0.2f,
                 "最短有效语音时长（秒），用于过滤突发噪声");
-            _vadSilenceConfig = Config.Bind("5. VoiceCall", "Vad_SilenceSeconds", 0.6f,
+            _vadSilenceConfig = Config.Bind("5. VoiceCall", "Vad_SilenceSeconds", 1.2f,
                 "停顿多久判定为说话结束（秒）");
+            _vadEndThresholdRatioConfig = Config.Bind("5. VoiceCall", "Vad_EndThresholdRatio", 0.4f,
+                "结束阈值比例（相对于主阈值，越小越不容易提前结束，建议 0.3 ~ 0.6）");
             _voiceCallBargeInConfig = Config.Bind("5. VoiceCall", "VoiceCall_BargeIn", true,
                 "允许在 AI 说话时打断并重新输入");
             _voiceCallResumeDelayConfig = Config.Bind("5. VoiceCall", "VoiceCall_ResumeDelay", 0.5f,
@@ -817,6 +820,14 @@ Response format MUST be:
                     GUILayout.Label($"{_vadSilenceConfig.Value:F2}s", GUILayout.Width(50f));
                     GUILayout.EndHorizontal();
                     _vadSilenceConfig.Value = newSilence;
+                    GUILayout.Space(5);
+
+                    GUILayout.Label($"结束阈值比例：{_vadEndThresholdRatioConfig.Value:F2}（越小越不容易提前断句）");
+                    GUILayout.BeginHorizontal();
+                    float newEndRatio = GUILayout.HorizontalSlider(_vadEndThresholdRatioConfig.Value, 0.1f, 1.0f);
+                    GUILayout.Label($"{_vadEndThresholdRatioConfig.Value:F2}", GUILayout.Width(50f));
+                    GUILayout.EndHorizontal();
+                    _vadEndThresholdRatioConfig.Value = newEndRatio;
                     GUILayout.Space(5);
 
                     _voiceCallBargeInConfig.Value = GUILayout.Toggle(_voiceCallBargeInConfig.Value,
@@ -1545,7 +1556,9 @@ Response format MUST be:
                 _vadThresholdConfig.Value,
                 _vadMinSpeechConfig.Value,
                 _vadSilenceConfig.Value,
-                MaxRecordingSeconds);
+                MaxRecordingSeconds,
+                0.02f,
+                _vadEndThresholdRatioConfig.Value);
             _vad.SpeechSegmentReady += OnVadSpeechSegmentReady;
 
             if (!_isRecording)
@@ -2089,6 +2102,7 @@ Response format MUST be:
                 ["Vad_EnergyThreshold"] = _vadThresholdConfig,
                 ["Vad_MinSpeechSeconds"] = _vadMinSpeechConfig,
                 ["Vad_SilenceSeconds"] = _vadSilenceConfig,
+                ["Vad_EndThresholdRatio"] = _vadEndThresholdRatioConfig,
                 ["VoiceCall_BargeIn"] = _voiceCallBargeInConfig,
                 ["VoiceCall_ResumeDelay"] = _voiceCallResumeDelayConfig
             };
@@ -2159,6 +2173,13 @@ Response format MUST be:
                     case "ShowWindowTitle": _showWindowTitle.Value = bool.Parse(value); break;
                     case "WindowWidth": _windowWidthConfig.Value = Mathf.Max(300f, float.Parse(value)); break;
                     case "WindowHeightBase": _windowHeightConfig.Value = Mathf.Max(100f, float.Parse(value)); break;
+                    case "Enable_VoiceCall": _enableVoiceCallConfig.Value = bool.Parse(value); break;
+                    case "Vad_EnergyThreshold": _vadThresholdConfig.Value = Mathf.Max(0.0001f, float.Parse(value)); break;
+                    case "Vad_MinSpeechSeconds": _vadMinSpeechConfig.Value = Mathf.Max(0.05f, float.Parse(value)); break;
+                    case "Vad_SilenceSeconds": _vadSilenceConfig.Value = Mathf.Max(0.1f, float.Parse(value)); break;
+                    case "Vad_EndThresholdRatio": _vadEndThresholdRatioConfig.Value = Mathf.Clamp(float.Parse(value), 0.1f, 1.0f); break;
+                    case "VoiceCall_BargeIn": _voiceCallBargeInConfig.Value = bool.Parse(value); break;
+                    case "VoiceCall_ResumeDelay": _voiceCallResumeDelayConfig.Value = Mathf.Max(0f, float.Parse(value)); break;
                     default:
                         error = $"unknown config key: {key}";
                         return false;

@@ -32,7 +32,8 @@ namespace AIChat.Core
 
         private readonly int _sampleRate;
         private readonly float _threshold;
-        private readonly float _endThreshold;
+        private float _endThreshold;
+        private readonly float _endThresholdRatio;
         private readonly int _minSpeechFrames;
         private readonly int _silenceFrames;
         private readonly int _maxSpeechFrames;
@@ -54,18 +55,21 @@ namespace AIChat.Core
         /// <param name="silenceSeconds">停顿多久判定为说话结束。</param>
         /// <param name="maxSpeechSeconds">单段语音最大时长，超时强制结束。</param>
         /// <param name="frameSeconds">每帧时长，默认 0.02（20ms）。</param>
+        /// <param name="endThresholdRatio">结束阈值相对阈值的比例（形成迟滞，避免抖动），默认 0.5。</param>
         public VoiceActivityDetector(
             int sampleRate,
             float threshold,
             float minSpeechSeconds,
             float silenceSeconds,
             float maxSpeechSeconds = 30f,
-            float frameSeconds = 0.02f)
+            float frameSeconds = 0.02f,
+            float endThresholdRatio = 0.5f)
         {
             _sampleRate = sampleRate;
             _threshold = threshold;
+            _endThresholdRatio = Math.Max(0.01f, Math.Min(1.0f, endThresholdRatio));
             // 结束阈值略低，形成迟滞，避免能量在阈值边缘抖动
-            _endThreshold = threshold * 0.6f;
+            _endThreshold = threshold * _endThresholdRatio;
             _frameSize = Math.Max(1, (int)(sampleRate * frameSeconds));
             _minSpeechFrames = Math.Max(1, (int)(minSpeechSeconds / frameSeconds));
             _silenceFrames = Math.Max(1, (int)(silenceSeconds / frameSeconds));
