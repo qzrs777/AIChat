@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace AIChat.Interop
@@ -25,6 +25,7 @@ namespace AIChat.Interop
         string ApiVersion { get; }
         bool IsBusy { get; }
         bool IsReady { get; }
+        bool IsContinuousCallActive { get; }
 
         event Action<AIChatApiConversationResult> ConversationCompleted;
 
@@ -41,5 +42,7 @@ namespace AIChat.Interop
         bool TryStartVoiceConversationFromWav(byte[] wavData, string inputSource, out string error);
         bool TryStartVoiceCapture(out string error);
         bool TryStopVoiceCaptureAndSend(string inputSource, out string error);
+        bool TryStartContinuousCall(out string error);
+        bool TryStopContinuousCall(out string error);
     }
 }

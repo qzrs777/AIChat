@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -17,7 +17,6 @@ using AIChat.Core;
 using AIChat.Services;
 using AIChat.Unity;
 using AIChat.Interop;
-using System.Collections.Generic;
 using AIChat.Utils;
 
 namespace ChillAIMod
@@ -32,6 +31,7 @@ namespace ChillAIMod
         public string ApiVersion => "1.0.0";
         public bool IsBusy => _isProcessing;
         public bool IsReady => _isTTSServiceReady;
+        public bool IsContinuousCallActive => _continuousCallActive;
         // ================= 【配置项】 =================
         private ConfigEntry<bool> _useOllama;
         private ConfigEntry<ThinkMode> _thinkModeConfig;
@@ -87,6 +87,14 @@ namespace ChillAIMod
         // --- 新增：添加聊天按钮配置 ---
         private ConfigEntry<bool> _addChatButtonConfig;
 
+        // --- 新增：持续通话（电话模式）配置 ---
+        private ConfigEntry<bool> _enableVoiceCallConfig;
+        private ConfigEntry<float> _vadThresholdConfig;
+        private ConfigEntry<float> _vadMinSpeechConfig;
+        private ConfigEntry<float> _vadSilenceConfig;
+        private ConfigEntry<bool> _voiceCallBargeInConfig;
+        private ConfigEntry<float> _voiceCallResumeDelayConfig;
+
         // 缓存游戏 UI 引用（避免 Find 在隐藏对象上失败）
         private Transform _cachedOriginalTextTrans = null;
         private GameObject _cachedCanvas = null;
@@ -96,6 +104,7 @@ namespace ChillAIMod
         private bool _showTtsSettings = false;
         private bool _showInterfaceSettings = false;
         private bool _showPersonaSettings = false;
+        private bool _showVoiceCallSettings = false;
 
         // --- 录音相关变量 ---
         private AudioClip _recordingClip;
@@ -103,6 +112,21 @@ namespace ChillAIMod
         private string _microphoneDevice = null;
         private const int RecordingFrequency = 16000; // 16kHz 对 Whisper 足够且省带宽
         private const int MaxRecordingSeconds = 30;   // 最长录 30 秒
+
+        // --- 新增：持续通话状态 ---
+        private bool _continuousCallActive = false;
+        private VoiceActivityDetector _vad;
+        private int _lastMicrophonePosition = 0;
+        private float[] _microphoneReadBuffer;
+        private Coroutine _currentConversationCoroutine;
+        private bool _abortCurrentConversation = false;
+        private Coroutine _resumeListeningCoroutine;
+
+        // 当前对话的 UI 句柄，用于打断时清理
+        private GameObject _currentOverlayTextObj;
+        private GameObject _currentOriginalTextObj;
+        private Dictionary<GameObject, bool> _currentUiStatusMap;
+        private bool _currentWasStoryUIHidden;
 
         // ================= 【UI 变量】 =================
         private bool _showInputWindow = false;
@@ -239,6 +263,20 @@ Response format MUST be:
             _addChatButtonConfig = Config.Bind("3. UI", "AddChatButton", false,
                 "在游戏UI中添加聊天按钮（开启后在屏幕右边显示）");
 
+            // --- 持续通话配置 ---
+            _enableVoiceCallConfig = Config.Bind("5. VoiceCall", "Enable_VoiceCall", false,
+                "启用持续通话模式（像打电话一样自动监听并回复）");
+            _vadThresholdConfig = Config.Bind("5. VoiceCall", "Vad_EnergyThreshold", 0.02f,
+                "语音检测能量阈值（越小越灵敏，建议 0.01 ~ 0.05）");
+            _vadMinSpeechConfig = Config.Bind("5. VoiceCall", "Vad_MinSpeechSeconds", 0.4f,
+                "最短有效语音时长（秒），用于过滤突发噪声");
+            _vadSilenceConfig = Config.Bind("5. VoiceCall", "Vad_SilenceSeconds", 1.0f,
+                "停顿多久判定为说话结束（秒）");
+            _voiceCallBargeInConfig = Config.Bind("5. VoiceCall", "VoiceCall_BargeIn", true,
+                "允许在 AI 说话时打断并重新输入");
+            _voiceCallResumeDelayConfig = Config.Bind("5. VoiceCall", "VoiceCall_ResumeDelay", 0.5f,
+                "AI 说完后多久恢复监听（秒）");
+
             // --- 人设配置 ---
             _useFinetunedModel = Config.Bind("4. Persona", "UseFinetunedModel", false,
                 "使用微调模型（satone-emotion，支持19种情感标签，开启后将自动设置对应的 System Prompt）");
@@ -332,6 +370,12 @@ Response format MUST be:
             if (_addChatButtonConfig.Value && !_aiChatButtonAdded && Time.frameCount % 300 == 0) // 每5秒检查一次，避免频繁查找
             {
                 AddAIChatButtonToRightIcons();
+            }
+
+            // 持续通话模式：轮询麦克风并驱动 VAD
+            if (_continuousCallActive && _isRecording)
+            {
+                PollContinuousMicrophone();
             }
         }
 
@@ -728,6 +772,70 @@ Response format MUST be:
                 GUILayout.EndVertical(); 
                 GUILayout.Space(5);
 
+                // --- 持续通话配置 Box ---
+                GUILayout.BeginVertical("box", GUILayout.Width(innerBoxWidth));
+                string voiceCallBtnText = _showVoiceCallSettings ? "🔽 持续通话配置" : "▶️ 持续通话配置";
+                if (GUILayout.Button(voiceCallBtnText, GUILayout.Height(elementHeight)))
+                {
+                    _showVoiceCallSettings = !_showVoiceCallSettings;
+                }
+
+                if (_showVoiceCallSettings)
+                {
+                    GUILayout.Space(5);
+                    bool prevEnable = _enableVoiceCallConfig.Value;
+                    _enableVoiceCallConfig.Value = GUILayout.Toggle(_enableVoiceCallConfig.Value,
+                        "☎️ 启用持续通话模式（像打电话一样自动监听）", GUILayout.Height(elementHeight));
+                    if (_enableVoiceCallConfig.Value && !prevEnable)
+                    {
+                        StartContinuousCall();
+                    }
+                    else if (!_enableVoiceCallConfig.Value && prevEnable)
+                    {
+                        StopContinuousCall();
+                    }
+                    GUILayout.Space(5);
+
+                    GUILayout.Label($"VAD 能量阈值：{_vadThresholdConfig.Value:F3}（越小越灵敏）");
+                    GUILayout.BeginHorizontal();
+                    float newThreshold = GUILayout.HorizontalSlider(_vadThresholdConfig.Value, 0.001f, 0.2f);
+                    GUILayout.Label($"{_vadThresholdConfig.Value:F3}", GUILayout.Width(50f));
+                    GUILayout.EndHorizontal();
+                    _vadThresholdConfig.Value = newThreshold;
+                    GUILayout.Space(5);
+
+                    GUILayout.Label($"最短有效语音：{_vadMinSpeechConfig.Value:F2} 秒");
+                    GUILayout.BeginHorizontal();
+                    float newMinSpeech = GUILayout.HorizontalSlider(_vadMinSpeechConfig.Value, 0.1f, 2.0f);
+                    GUILayout.Label($"{_vadMinSpeechConfig.Value:F2}s", GUILayout.Width(50f));
+                    GUILayout.EndHorizontal();
+                    _vadMinSpeechConfig.Value = newMinSpeech;
+                    GUILayout.Space(5);
+
+                    GUILayout.Label($"停顿判定结束：{_vadSilenceConfig.Value:F2} 秒");
+                    GUILayout.BeginHorizontal();
+                    float newSilence = GUILayout.HorizontalSlider(_vadSilenceConfig.Value, 0.3f, 3.0f);
+                    GUILayout.Label($"{_vadSilenceConfig.Value:F2}s", GUILayout.Width(50f));
+                    GUILayout.EndHorizontal();
+                    _vadSilenceConfig.Value = newSilence;
+                    GUILayout.Space(5);
+
+                    _voiceCallBargeInConfig.Value = GUILayout.Toggle(_voiceCallBargeInConfig.Value,
+                        "允许打断 AI 说话", GUILayout.Height(elementHeight));
+                    GUILayout.Space(5);
+
+                    GUILayout.Label($"AI 说完后恢复监听延迟：{_voiceCallResumeDelayConfig.Value:F2} 秒");
+                    GUILayout.BeginHorizontal();
+                    float newResumeDelay = GUILayout.HorizontalSlider(_voiceCallResumeDelayConfig.Value, 0.0f, 2.0f);
+                    GUILayout.Label($"{_voiceCallResumeDelayConfig.Value:F2}s", GUILayout.Width(50f));
+                    GUILayout.EndHorizontal();
+                    _voiceCallResumeDelayConfig.Value = newResumeDelay;
+                    GUILayout.Space(5);
+                }
+
+                GUILayout.EndVertical();
+                GUILayout.Space(5);
+
                 // --- 人设配置 Box ---
                 GUILayout.BeginVertical("box", GUILayout.Width(innerBoxWidth));
                 string personaBtnText = _showPersonaSettings ? "🔽 人设配置" : "▶️ 人设配置";
@@ -831,7 +939,7 @@ Response format MUST be:
             // 如果需要发送消息，在渲染 TextArea 之前拦截事件
             if (shouldSendMessage)
             {
-                StartCoroutine(AIProcessRoutine(_playerInput));
+                _currentConversationCoroutine = StartCoroutine(AIProcessRoutine(_playerInput));
                 _playerInput = "";
                 keyEvent.Use(); // 消费事件，防止 TextArea 处理
             }
@@ -855,7 +963,7 @@ Response format MUST be:
             {
                 if (!string.IsNullOrEmpty(_playerInput) && !_isProcessing)
                 {
-                    StartCoroutine(AIProcessRoutine(_playerInput));
+                    _currentConversationCoroutine = StartCoroutine(AIProcessRoutine(_playerInput));
                     _playerInput = "";
                 }
             }
@@ -872,7 +980,14 @@ Response format MUST be:
             string micBtnText;
             if (_isProcessing)
             {
-                micBtnText = "⏳ 思考中...";
+                micBtnText = _continuousCallActive ? "🔴 AI回复中..." : "⏳ 思考中...";
+            }
+            else if (_continuousCallActive)
+            {
+                if (_vad != null && _vad.State == VoiceActivityDetector.VadState.Speech)
+                    micBtnText = "🟡 说话中...";
+                else
+                    micBtnText = _isRecording ? "🟢 监听中..." : "⏸️ 暂停";
             }
             else
             {
@@ -893,7 +1008,7 @@ Response format MUST be:
             switch (e.type)
             {
                 case EventType.MouseDown:
-                    if (btnRect.Contains(e.mousePosition) && !_isProcessing)
+                    if (btnRect.Contains(e.mousePosition) && !_isProcessing && !_continuousCallActive)
                     {
                         GUIUtility.hotControl = controlID; 
                         StartRecording();
@@ -914,6 +1029,17 @@ Response format MUST be:
             GUI.Box(btnRect, micBtnText, GUI.skin.button);
 
             GUILayout.EndHorizontal();
+
+            // 持续通话模式开关
+            GUILayout.Space(5);
+            GUI.backgroundColor = _continuousCallActive ? new Color(0.2f, 0.8f, 0.2f) : new Color(0.1725f, 0.1608f, 0.2784f);
+            string callToggleText = _continuousCallActive ? "☎️ 结束持续通话" : "☎️ 开始持续通话";
+            if (GUILayout.Button(callToggleText, GUILayout.Height(elementHeight * 1.2f)))
+            {
+                if (_continuousCallActive) StopContinuousCall();
+                else StartContinuousCall();
+            }
+            GUI.backgroundColor = Color.white;
 
             // 结束整体布局
             GUILayout.EndVertical();
@@ -959,6 +1085,9 @@ Response format MUST be:
                 TtsSucceeded = false,
                 TimestampUtc = DateTime.UtcNow
             };
+
+            _abortCurrentConversation = false;
+
             // 1. 获取并处理 UI
             if (_cachedCanvas == null) _cachedCanvas = GameObject.Find("Canvas");
             if (_cachedCanvas == null)
@@ -998,6 +1127,13 @@ Response format MUST be:
             UIHelper.ForceShowWindow(originalTextObj, uiStatusMap);
             originalTextObj.SetActive(false);
             GameObject myTextObj = UIHelper.CreateOverlayText(parentObj);
+
+            // 保存 UI 句柄，便于打断时清理
+            _currentWasStoryUIHidden = wasStoryUIHidden;
+            _currentOriginalTextObj = originalTextObj;
+            _currentOverlayTextObj = myTextObj;
+            _currentUiStatusMap = uiStatusMap;
+
             Text myText = myTextObj.GetComponent<Text>();
             myText.text = "Thinking...";
             myText.color = Color.yellow;
@@ -1068,6 +1204,15 @@ Response format MUST be:
                 yield break;
             }
 
+            // 如果被打断，跳过剩余处理
+            if (_abortCurrentConversation)
+            {
+                Log.Info("[VoiceCall] 当前对话已打断，跳过回复");
+                CleanupConversationUI();
+                _isProcessing = false;
+                yield break;
+            }
+
             // 4. 处理回复并下载语音
             if (!string.IsNullOrEmpty(fullResponse))
             {
@@ -1117,6 +1262,14 @@ Response format MUST be:
                         if (!downloadedClip.LoadAudioData()) yield return null;
                         yield return null;
 
+                        if (_abortCurrentConversation)
+                        {
+                            Log.Info("[VoiceCall] TTS 下载完成后检测到打断，跳过播放");
+                            CleanupConversationUI();
+                            _isProcessing = false;
+                            yield break;
+                        }
+
                         myText.text = subtitleText;
                         myText.color = Color.white;
 
@@ -1147,6 +1300,14 @@ Response format MUST be:
             }
 
             // 5. 清理
+            if (_abortCurrentConversation)
+            {
+                Log.Info("[VoiceCall] 对话流程末尾检测到打断，执行清理");
+                CleanupConversationUI();
+                _isProcessing = false;
+                yield break;
+            }
+
             UIHelper.RestoreUiStatus(uiStatusMap, myTextObj, originalTextObj);
             // 静音模式下重新隐藏游戏 UI
             if (wasStoryUIHidden && _storySystemUI != null) _storySystemUI.SetActive(false);
@@ -1191,8 +1352,14 @@ Response format MUST be:
             if (emotion != "Drink" && emotion != "Relaxed")
             {
                 GameBridge.CallNativeChangeAnim(250);
-                yield return new WaitForSecondsRealtime(0.2f);
+                float elapsed = 0f;
+                while (elapsed < 0.2f && !_abortCurrentConversation)
+                {
+                    yield return null;
+                    elapsed += Time.unscaledDeltaTime;
+                }
             }
+            if (_abortCurrentConversation) { _isAISpeaking = false; yield break; }
             if (voiceClip != null)
             {
                 // 2. 播放语音 + 动作
@@ -1211,10 +1378,20 @@ Response format MUST be:
             {
                 var greetAnim = GameBridge.PickRandomAnimation("Greeting");
                 GameBridge.PlayAnimation(greetAnim);
-                yield return new WaitForSecondsRealtime(0.3f);
+                float greetElapsed = 0f;
+                while (greetElapsed < 0.3f && !_abortCurrentConversation)
+                {
+                    yield return null;
+                    greetElapsed += Time.unscaledDeltaTime;
+                }
                 GameBridge.ControlLookAt(1.0f, 0.5f);
                 float waitTime = Mathf.Max(clipDuration, 2.5f);
-                yield return new WaitForSecondsRealtime(waitTime);
+                greetElapsed = 0f;
+                while (greetElapsed < waitTime && !_abortCurrentConversation)
+                {
+                    yield return null;
+                    greetElapsed += Time.unscaledDeltaTime;
+                }
                 GameBridge.CallNativeChangeAnim(250);
                 GameBridge.RestoreLookAt();
                 _isAISpeaking = false;
@@ -1227,7 +1404,13 @@ Response format MUST be:
             GameBridge.PlayAnimation(pickedAnim);
 
             // 等待语音播完，增加0.5秒缓冲，以防止过早判断AI动作结束
-            yield return new WaitForSecondsRealtime(clipDuration + 0.5f);
+            float playElapsed = 0f;
+            float playTimeout = clipDuration + 0.5f;
+            while (playElapsed < playTimeout && !_abortCurrentConversation)
+            {
+                yield return null;
+                playElapsed += Time.unscaledDeltaTime;
+            }
 
             // 恢复
             if (_audioSource != null && _audioSource.isPlaying) {
@@ -1261,9 +1444,21 @@ Response format MUST be:
             }
 
             _microphoneDevice = Microphone.devices[0];
-            _recordingClip = Microphone.Start(_microphoneDevice, false, MaxRecordingSeconds, RecordingFrequency);
+            bool loop = _continuousCallActive;
+            _recordingClip = Microphone.Start(_microphoneDevice, loop, MaxRecordingSeconds, RecordingFrequency);
             _isRecording = true;
-            Log.Info($"开始录音: {_microphoneDevice}");
+            _lastMicrophonePosition = 0;
+            if (loop)
+            {
+                _vad?.Reset();
+                int bufferSize = Mathf.Max(1024, RecordingFrequency / 20); // 50ms
+                _microphoneReadBuffer = new float[bufferSize];
+                Log.Info($"[VoiceCall] 开始循环监听: {_microphoneDevice}");
+            }
+            else
+            {
+                Log.Info($"开始录音: {_microphoneDevice}");
+            }
         }
 
         void StopRecordingAndRecognize()
@@ -1306,7 +1501,8 @@ Response format MUST be:
                 Log.Info($"[Workflow] ASR 成功，开始进入 AI 思考流程: {recognizedResult}");
 
                 // 这里触发 AI 处理流程
-                yield return StartCoroutine(AIProcessRoutine(recognizedResult, inputSource));
+                _currentConversationCoroutine = StartCoroutine(AIProcessRoutine(recognizedResult, inputSource));
+                yield return _currentConversationCoroutine;
             }
             else
             {
@@ -1330,9 +1526,184 @@ Response format MUST be:
                 });
             }
         }
+
+        // ================= 【新增：持续通话模式】 =================
+
+        void StartContinuousCall()
+        {
+            if (_continuousCallActive) return;
+            if (Microphone.devices.Length == 0)
+            {
+                Log.Error("[VoiceCall] 未检测到麦克风，无法开启持续通话");
+                _playerInput = "[Error: No Mic Found]";
+                return;
+            }
+
+            _continuousCallActive = true;
+            _enableVoiceCallConfig.Value = true;
+            Config.Save();
+
+            _vad = new VoiceActivityDetector(
+                RecordingFrequency,
+                _vadThresholdConfig.Value,
+                _vadMinSpeechConfig.Value,
+                _vadSilenceConfig.Value,
+                MaxRecordingSeconds);
+            _vad.SpeechSegmentReady += OnVadSpeechSegmentReady;
+
+            if (!_isRecording)
+            {
+                StartRecording();
+            }
+
+            Log.Info("[VoiceCall] 持续通话模式已开启");
+        }
+
+        void StopContinuousCall()
+        {
+            if (!_continuousCallActive) return;
+
+            _continuousCallActive = false;
+            _enableVoiceCallConfig.Value = false;
+            Config.Save();
+
+            if (_vad != null)
+            {
+                _vad.SpeechSegmentReady -= OnVadSpeechSegmentReady;
+                _vad = null;
+            }
+
+            if (_resumeListeningCoroutine != null)
+            {
+                StopCoroutine(_resumeListeningCoroutine);
+                _resumeListeningCoroutine = null;
+            }
+
+            if (_isRecording)
+            {
+                Microphone.End(_microphoneDevice);
+                _isRecording = false;
+            }
+
+            Log.Info("[VoiceCall] 持续通话模式已关闭");
+        }
+
+        void PollContinuousMicrophone()
+        {
+            if (_recordingClip == null || _microphoneDevice == null) return;
+
+            int currentPos = Microphone.GetPosition(_microphoneDevice);
+            if (currentPos < 0) return;
+
+            int totalSamples = _recordingClip.samples;
+            int samplesToRead = (currentPos - _lastMicrophonePosition + totalSamples) % totalSamples;
+            if (samplesToRead <= 0) return;
+
+            if (_microphoneReadBuffer == null || _microphoneReadBuffer.Length < samplesToRead)
+            {
+                _microphoneReadBuffer = new float[samplesToRead];
+            }
+
+            int firstPart = Math.Min(samplesToRead, totalSamples - _lastMicrophonePosition);
+            _recordingClip.GetData(_microphoneReadBuffer, _lastMicrophonePosition);
+
+            if (firstPart < samplesToRead)
+            {
+                int secondPart = samplesToRead - firstPart;
+                float[] wrapBuffer = new float[secondPart];
+                _recordingClip.GetData(wrapBuffer, 0);
+                Array.Copy(wrapBuffer, 0, _microphoneReadBuffer, firstPart, secondPart);
+            }
+
+            _lastMicrophonePosition = currentPos;
+            _vad?.Process(_microphoneReadBuffer);
+        }
+
+        void OnVadSpeechSegmentReady(float[] samples)
+        {
+            Log.Info($"[VoiceCall] VAD 检测到语音段，长度 {samples.Length / (float)RecordingFrequency:F2}s");
+
+            byte[] wavData = AudioUtils.EncodeToWAV(samples, RecordingFrequency, 1);
+            if (wavData == null || wavData.Length == 0) return;
+
+            if (_isProcessing)
+            {
+                if (_voiceCallBargeInConfig.Value)
+                {
+                    Log.Info("[VoiceCall] AI 忙碌中，启用打断");
+                    InterruptCurrentConversation();
+                }
+                else
+                {
+                    Log.Info("[VoiceCall] AI 忙碌中，忽略本次语音（未开启打断）");
+                    return;
+                }
+            }
+
+            StartCoroutine(ASRWorkflow(wavData, "voicecall"));
+        }
+
+        void InterruptCurrentConversation()
+        {
+            Log.Info("[VoiceCall] 打断当前 AI 回复");
+            _abortCurrentConversation = true;
+
+            if (_audioSource != null && _audioSource.isPlaying)
+            {
+                _audioSource.Stop();
+            }
+            _isAISpeaking = false;
+
+            if (_currentConversationCoroutine != null)
+            {
+                StopCoroutine(_currentConversationCoroutine);
+                _currentConversationCoroutine = null;
+            }
+
+            CleanupConversationUI();
+            _isProcessing = false;
+        }
+
+        void CleanupConversationUI()
+        {
+            try
+            {
+                if (_currentUiStatusMap != null)
+                {
+                    UIHelper.RestoreUiStatus(_currentUiStatusMap, _currentOverlayTextObj, _currentOriginalTextObj);
+                }
+                if (_currentWasStoryUIHidden && _storySystemUI != null)
+                {
+                    _storySystemUI.SetActive(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[VoiceCall] 清理 UI 时异常: {ex.Message}");
+            }
+            finally
+            {
+                _currentOverlayTextObj = null;
+                _currentOriginalTextObj = null;
+                _currentUiStatusMap = null;
+                _currentWasStoryUIHidden = false;
+            }
+        }
+
+        IEnumerator ResumeListeningAfterDelay(float delay)
+        {
+            yield return new WaitForSecondsRealtime(delay);
+            if (_continuousCallActive && !_isRecording && !_isProcessing)
+            {
+                StartRecording();
+            }
+            _resumeListeningCoroutine = null;
+        }
+
         void OnApplicationQuit()
         {
             Instance = null;
+            StopContinuousCall();
             Log.Info("[Chill AI Mod] 退出中...");
             
             // 【保存记忆系统】
@@ -1672,6 +2043,17 @@ Response format MUST be:
             {
                 Log.Error($"[PublicApi] ConversationCompleted 回调异常: {ex.Message}");
             }
+
+            // 持续通话模式：本轮对话结束后自动恢复监听
+            if (_continuousCallActive && !_isRecording && !_isProcessing)
+            {
+                float delay = _voiceCallResumeDelayConfig.Value;
+                if (_resumeListeningCoroutine != null)
+                {
+                    StopCoroutine(_resumeListeningCoroutine);
+                }
+                _resumeListeningCoroutine = StartCoroutine(ResumeListeningAfterDelay(delay));
+            }
         }
 
         private Dictionary<string, ConfigEntryBase> GetConfigEntryMap()
@@ -1702,7 +2084,13 @@ Response format MUST be:
                 ["BackgroundOpacity"] = _backgroundOpacity,
                 ["ShowWindowTitle"] = _showWindowTitle,
                 ["WindowWidth"] = _windowWidthConfig,
-                ["WindowHeightBase"] = _windowHeightConfig
+                ["WindowHeightBase"] = _windowHeightConfig,
+                ["Enable_VoiceCall"] = _enableVoiceCallConfig,
+                ["Vad_EnergyThreshold"] = _vadThresholdConfig,
+                ["Vad_MinSpeechSeconds"] = _vadMinSpeechConfig,
+                ["Vad_SilenceSeconds"] = _vadSilenceConfig,
+                ["VoiceCall_BargeIn"] = _voiceCallBargeInConfig,
+                ["VoiceCall_ResumeDelay"] = _voiceCallResumeDelayConfig
             };
         }
 
@@ -1842,7 +2230,7 @@ Response format MUST be:
                 return false;
             }
 
-            StartCoroutine(AIProcessRoutine(text, string.IsNullOrWhiteSpace(inputSource) ? "external-text" : inputSource));
+            _currentConversationCoroutine = StartCoroutine(AIProcessRoutine(text, string.IsNullOrWhiteSpace(inputSource) ? "external-text" : inputSource));
             return true;
         }
 
@@ -1902,6 +2290,39 @@ Response format MUST be:
             }
 
             StopRecordingAndRecognize();
+            return true;
+        }
+
+        public bool TryStartContinuousCall(out string error)
+        {
+            error = string.Empty;
+            if (_continuousCallActive)
+            {
+                error = "continuous call already active";
+                return false;
+            }
+            if (Microphone.devices.Length == 0)
+            {
+                error = "no microphone found";
+                return false;
+            }
+
+            _enableVoiceCallConfig.Value = true;
+            StartContinuousCall();
+            return true;
+        }
+
+        public bool TryStopContinuousCall(out string error)
+        {
+            error = string.Empty;
+            if (!_continuousCallActive)
+            {
+                error = "continuous call not active";
+                return false;
+            }
+
+            _enableVoiceCallConfig.Value = false;
+            StopContinuousCall();
             return true;
         }
     }
