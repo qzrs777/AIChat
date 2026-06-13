@@ -117,7 +117,6 @@ namespace ChillAIMod
         private bool _continuousCallActive = false;
         private VoiceActivityDetector _vad;
         private int _lastMicrophonePosition = 0;
-        private float[] _microphoneReadBuffer;
         private Coroutine _currentConversationCoroutine;
         private bool _abortCurrentConversation = false;
         private Coroutine _resumeListeningCoroutine;
@@ -266,11 +265,11 @@ Response format MUST be:
             // --- 持续通话配置 ---
             _enableVoiceCallConfig = Config.Bind("5. VoiceCall", "Enable_VoiceCall", false,
                 "启用持续通话模式（像打电话一样自动监听并回复）");
-            _vadThresholdConfig = Config.Bind("5. VoiceCall", "Vad_EnergyThreshold", 0.02f,
-                "语音检测能量阈值（越小越灵敏，建议 0.01 ~ 0.05）");
-            _vadMinSpeechConfig = Config.Bind("5. VoiceCall", "Vad_MinSpeechSeconds", 0.4f,
+            _vadThresholdConfig = Config.Bind("5. VoiceCall", "Vad_EnergyThreshold", 0.003f,
+                "语音检测能量阈值（越小越灵敏，建议 0.002 ~ 0.01）");
+            _vadMinSpeechConfig = Config.Bind("5. VoiceCall", "Vad_MinSpeechSeconds", 0.2f,
                 "最短有效语音时长（秒），用于过滤突发噪声");
-            _vadSilenceConfig = Config.Bind("5. VoiceCall", "Vad_SilenceSeconds", 1.0f,
+            _vadSilenceConfig = Config.Bind("5. VoiceCall", "Vad_SilenceSeconds", 0.6f,
                 "停顿多久判定为说话结束（秒）");
             _voiceCallBargeInConfig = Config.Bind("5. VoiceCall", "VoiceCall_BargeIn", true,
                 "允许在 AI 说话时打断并重新输入");
@@ -1451,8 +1450,6 @@ Response format MUST be:
             if (loop)
             {
                 _vad?.Reset();
-                int bufferSize = Mathf.Max(1024, RecordingFrequency / 20); // 50ms
-                _microphoneReadBuffer = new float[bufferSize];
                 Log.Info($"[VoiceCall] 开始循环监听: {_microphoneDevice}");
             }
             else
@@ -1599,24 +1596,27 @@ Response format MUST be:
             int samplesToRead = (currentPos - _lastMicrophonePosition + totalSamples) % totalSamples;
             if (samplesToRead <= 0) return;
 
-            if (_microphoneReadBuffer == null || _microphoneReadBuffer.Length < samplesToRead)
-            {
-                _microphoneReadBuffer = new float[samplesToRead];
-            }
-
+            // 分配精确大小的缓冲区，避免读到旧数据或越界
+            float[] samples = new float[samplesToRead];
             int firstPart = Math.Min(samplesToRead, totalSamples - _lastMicrophonePosition);
-            _recordingClip.GetData(_microphoneReadBuffer, _lastMicrophonePosition);
+
+            if (firstPart > 0)
+            {
+                float[] firstBuffer = new float[firstPart];
+                _recordingClip.GetData(firstBuffer, _lastMicrophonePosition);
+                Array.Copy(firstBuffer, 0, samples, 0, firstPart);
+            }
 
             if (firstPart < samplesToRead)
             {
                 int secondPart = samplesToRead - firstPart;
-                float[] wrapBuffer = new float[secondPart];
-                _recordingClip.GetData(wrapBuffer, 0);
-                Array.Copy(wrapBuffer, 0, _microphoneReadBuffer, firstPart, secondPart);
+                float[] secondBuffer = new float[secondPart];
+                _recordingClip.GetData(secondBuffer, 0);
+                Array.Copy(secondBuffer, 0, samples, firstPart, secondPart);
             }
 
             _lastMicrophonePosition = currentPos;
-            _vad?.Process(_microphoneReadBuffer);
+            _vad?.Process(samples);
         }
 
         void OnVadSpeechSegmentReady(float[] samples)

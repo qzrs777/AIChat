@@ -40,7 +40,14 @@ namespace AIChat.Services
                 else
                 {
                     string errorMsg = $"{request.error}";
+                    string errorBody = request.downloadHandler?.text ?? "";
                     long responseCode = request.responseCode;
+
+                    if (!string.IsNullOrWhiteSpace(errorBody))
+                    {
+                        errorMsg += $" | Response: {errorBody}";
+                    }
+                    Log.Error($"[LLMClient] API 错误 [{responseCode}]: {errorMsg}");
                     onFailure(errorMsg, responseCode);
                 }
             }

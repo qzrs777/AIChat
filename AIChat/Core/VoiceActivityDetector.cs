@@ -42,6 +42,10 @@ namespace AIChat.Core
         private int _silenceFramesCount;
         private List<float> _speechBuffer;
 
+        // 调试用：每约 1 秒输出一次当前能量和状态
+        private int _frameCounter;
+        private readonly int _logIntervalFrames;
+
         /// <summary>
         /// </summary>
         /// <param name="sampleRate">采样率，如 16000。</param>
@@ -66,6 +70,8 @@ namespace AIChat.Core
             _minSpeechFrames = Math.Max(1, (int)(minSpeechSeconds / frameSeconds));
             _silenceFrames = Math.Max(1, (int)(silenceSeconds / frameSeconds));
             _maxSpeechFrames = Math.Max(1, (int)(maxSpeechSeconds / frameSeconds));
+            // 约 1 秒输出一次调试日志（20ms 一帧 => 50 帧）
+            _logIntervalFrames = Math.Max(10, (int)(1.0f / frameSeconds));
         }
 
         public void Reset()
@@ -74,6 +80,7 @@ namespace AIChat.Core
             CurrentEnergy = 0f;
             _speechFrames = 0;
             _silenceFramesCount = 0;
+            _frameCounter = 0;
             _speechBuffer?.Clear();
         }
 
@@ -115,6 +122,7 @@ namespace AIChat.Core
                             State = VadState.Speech;
                             _speechBuffer = new List<float>(_frameSize * _silenceFrames * 2);
                             _silenceFramesCount = 0;
+                            Log.Info($"[VAD] 检测到语音开始，能量 {CurrentEnergy:F4} >= 阈值 {_threshold:F4}");
                             // 把触发前的有效帧也补进去（因为 minSpeechFrames 已经满足阈值）
                             AppendCurrentFrame(samples, offset, length);
                         }
@@ -148,6 +156,12 @@ namespace AIChat.Core
                         FinalizeSpeechSegment();
                     }
                     break;
+            }
+
+            _frameCounter++;
+            if (_frameCounter % _logIntervalFrames == 0)
+            {
+                Log.Info($"[VAD Debug] 状态={State}, 能量={CurrentEnergy:F4}, 阈值={_threshold:F4}");
             }
         }
 
