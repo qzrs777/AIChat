@@ -13,3 +13,7 @@
 - BepInEx 对插件版本号有格式要求，所以 V1.0.0 这种是不可以的，将会无法加载。
 -->
 更新内容：
+- 新增“持续通话”模式：开启后 Mod 会持续监听麦克风，检测到玩家说话并停顿后自动进行 ASR → LLM → TTS 回复，AI 说完后自动恢复监听。
+- 支持在 AI 说话期间打断（Barge-in）：检测到新的语音输入会停止当前播放并立即开始新一轮对话。
+- 新增 VAD（语音活动检测）参数配置：能量阈值、最短有效语音、停顿判定结束、恢复监听延迟、是否允许打断。
+- 扩展公开 API：`IsContinuousCallActive`、`TryStartContinuousCall`、`TryStopContinuousCall`。

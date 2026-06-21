@@ -30,6 +30,7 @@ BepInEx.dll
 
 secrets.json
 *.cfg
+.dotnet/
 
 !/build-resource/**
 # build-resource 中的 Unity DLL 文件，除 UnityEngine.UI.dll 外，都是闭源的，不应包含在仓库内。
