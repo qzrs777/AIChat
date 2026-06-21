@@ -13,11 +13,3 @@
 - BepInEx 对插件版本号有格式要求，所以 V1.0.0 这种是不可以的，将会无法加载。
 -->
 更新内容：
-- 感谢 [DSeaStar](https://github.com/DSeaStar) 提交本次持续通话相关更新。
-- 新增客户端能量阈值 VAD（语音活动检测），实现 `VoiceActivityDetector.cs`。
-- 支持循环麦克风录音与自动语音分段，可在检测到玩家说话并停顿后自动进入新一轮 ASR → LLM → TTS 对话。
-- 新增 `VoiceCall` 配置分区与 UI 开关，支持调整持续通话、VAD 阈值、最短有效语音、停顿判定、恢复监听延迟、是否允许打断等参数。
-- 支持在 AI 说话期间打断（Barge-in）：检测到新的语音输入会停止当前播放，并立即开始新一轮对话。
-- AI 回复播放结束后自动恢复麦克风监听。
-- 扩展公开 API：`IsContinuousCallActive`、`TryStartContinuousCall`、`TryStopContinuousCall`。
-- 更新 README 与发布说明。
